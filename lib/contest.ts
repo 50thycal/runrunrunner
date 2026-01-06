@@ -381,21 +381,17 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
 }
 
 export async function getUserRank(fid: number, contestDay?: string): Promise<number | null> {
-  requireKV()
+  // Use leaderboard to find rank since it handles both JSON blob members
+  // and simple fid string members
   const day = contestDay || getContestDay()
-  const scoresKey = keys.scores(day)
+  const leaderboard = await getLeaderboard(day, 100)
 
-  // ZREVRANK returns 0-based rank (0 = highest score)
-  const rank = await kv.zrevrank(scoresKey, fid.toString())
+  const entry = leaderboard.find((e) => e.fid === fid)
+  const rank = entry?.rank ?? null
 
-  console.log(`[Rank] fid=${fid}, key=${scoresKey}, zrevrank=${rank}`)
+  console.log(`[Rank] fid=${fid}, day=${day}, found=${!!entry}, rank=${rank}`)
 
-  if (rank === null || rank === undefined) {
-    return null
-  }
-
-  // Convert to 1-based rank
-  return rank + 1
+  return rank
 }
 
 export async function getUserStats(fid: number): Promise<UserStats> {
