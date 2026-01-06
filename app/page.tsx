@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { Game } from '@/components/Game'
 import { Lobby } from '@/components/Lobby'
+import { Leaderboard } from '@/components/Leaderboard'
 
 export default function Home() {
   const { status, user, error, signIn, signOut, isInMiniApp } = useAuthSession()
   const [showGame, setShowGame] = useState(false)
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [bestScore, setBestScore] = useState(0)
 
   // Load best score from localStorage
@@ -68,6 +70,18 @@ export default function Home() {
           An endless platform runner. Flip between floor and ceiling to survive!
         </p>
 
+        <div style={{
+          marginTop: 20,
+          padding: '12px 16px',
+          backgroundColor: 'rgba(139, 92, 246, 0.15)',
+          borderRadius: 8,
+          maxWidth: 280,
+        }}>
+          <p style={{ margin: 0, fontSize: 12 }}>
+            🏆 Daily prizes for top 3 scores on Base L2
+          </p>
+        </div>
+
         {!isInMiniApp && (
           <div style={{
             marginTop: 30,
@@ -121,6 +135,16 @@ export default function Home() {
     )
   }
 
+  // Show leaderboard overlay
+  if (showLeaderboard) {
+    return (
+      <Leaderboard
+        fid={user.fid}
+        onClose={() => setShowLeaderboard(false)}
+      />
+    )
+  }
+
   // Signed in but not playing yet - show lobby
   if (!showGame) {
     return (
@@ -129,12 +153,14 @@ export default function Home() {
         displayName={user.displayName}
         pfpUrl={user.pfpUrl}
         verified={user.verified}
+        fid={user.fid}
         bestScore={bestScore}
         onPlay={() => setShowGame(true)}
         onSignOut={() => {
           setShowGame(false)
           signOut()
         }}
+        onShowLeaderboard={() => setShowLeaderboard(true)}
       />
     )
   }
@@ -145,6 +171,7 @@ export default function Home() {
       username={user.username}
       displayName={user.displayName}
       fid={user.fid}
+      onShowLeaderboard={() => setShowLeaderboard(true)}
     />
   )
 }

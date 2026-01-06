@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-type GameState = 'idle' | 'playing' | 'gameover'
+type GameState = 'idle' | 'starting' | 'playing' | 'gameover' | 'submitting'
 type Lane = 'floor' | 'ceiling'
 
 interface Obstacle {
@@ -29,15 +29,18 @@ interface GameProps {
   username?: string
   displayName?: string
   fid: number
+  onShowLeaderboard?: () => void
 }
 
-export function Game({ username, displayName, fid }: GameProps) {
+export function Game({ username, displayName, fid, onShowLeaderboard }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [gameState, setGameState] = useState<GameState>('idle')
   const [score, setScore] = useState(0)
   const [bestScore, setBestScore] = useState(0)
   const [shareMessage, setShareMessage] = useState<string | null>(null)
+  const [serverRank, setServerRank] = useState<number | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   // Game state refs for animation loop
   const gameStateRef = useRef<GameState>('idle')
@@ -55,6 +58,7 @@ export function Game({ username, displayName, fid }: GameProps) {
   const canvasSizeRef = useRef({ width: 0, height: 0 })
   const floorYRef = useRef(0)
   const ceilingYRef = useRef(0)
+  const sessionTokenRef = useRef<string | null>(null)
 
   // Load best score from localStorage
   useEffect(() => {
@@ -115,8 +119,81 @@ export function Game({ username, displayName, fid }: GameProps) {
     flipStartTimeRef.current = performance.now()
   }, [getLaneY])
 
-  // Start the game
-  const startGame = useCallback(() => {
+  // Request session token from server
+  const requestSession = useCallback(async (): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/game/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fid }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        console.error('Failed to get session:', data.error)
+        setSubmitError(data.error || 'Failed to start game')
+        return null
+      }
+
+      return data.sessionToken
+    } catch (error) {
+      console.error('Session request error:', error)
+      setSubmitError('Network error')
+      return null
+    }
+  }, [fid])
+
+  // Submit score to server
+  const submitScore = useCallback(async (finalScore: number, token: string) => {
+    try {
+      const response = await fetch('/api/game/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionToken: token,
+          score: finalScore,
+          fid,
+          username,
+          displayName,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        console.error('Score submission failed:', data.error)
+        setSubmitError(data.error || 'Failed to submit score')
+        return
+      }
+
+      setServerRank(data.rank)
+      setSubmitError(null)
+    } catch (error) {
+      console.error('Score submission error:', error)
+      setSubmitError('Network error')
+    }
+  }, [fid, username, displayName])
+
+  // Start the game (with session)
+  const startGame = useCallback(async () => {
+    // Reset state
+    setSubmitError(null)
+    setServerRank(null)
+    setGameState('starting')
+    gameStateRef.current = 'starting'
+
+    // Request session token
+    const token = await requestSession()
+    if (!token) {
+      setGameState('idle')
+      gameStateRef.current = 'idle'
+      return
+    }
+
+    sessionTokenRef.current = token
+
+    // Start game
     gameStateRef.current = 'playing'
     setGameState('playing')
     playerLaneRef.current = 'floor'
@@ -129,23 +206,31 @@ export function Game({ username, displayName, fid }: GameProps) {
     speedRef.current = BASE_SPEED
     gameStartTimeRef.current = performance.now()
     lastSpawnTimeRef.current = performance.now()
-  }, [getLaneY])
+  }, [getLaneY, requestSession])
 
   // End the game
-  const endGame = useCallback(() => {
-    gameStateRef.current = 'gameover'
-    setGameState('gameover')
+  const endGame = useCallback(async () => {
+    gameStateRef.current = 'submitting'
+    setGameState('submitting')
 
     const finalScore = scoreRef.current
     setScore(finalScore)
 
-    // Update best score
+    // Update local best score
     const currentBest = parseInt(localStorage.getItem('runrunrunner-best') || '0', 10)
     if (finalScore > currentBest) {
       localStorage.setItem('runrunrunner-best', finalScore.toString())
       setBestScore(finalScore)
     }
-  }, [])
+
+    // Submit score to server
+    if (sessionTokenRef.current) {
+      await submitScore(finalScore, sessionTokenRef.current)
+    }
+
+    setGameState('gameover')
+    gameStateRef.current = 'gameover'
+  }, [submitScore])
 
   // Handle input
   const handleInput = useCallback(() => {
@@ -156,12 +241,14 @@ export function Game({ username, displayName, fid }: GameProps) {
     } else if (gameStateRef.current === 'gameover') {
       startGame()
     }
+    // Ignore input during 'starting' and 'submitting' states
   }, [startGame, flip])
 
   // Share handler
   const handleShare = useCallback(async () => {
     const playerName = username ? `@${username}` : `FID:${fid}`
-    const text = `${playerName} scored ${scoreRef.current} in runrunrunner v-012! 🏃`
+    const rankText = serverRank ? ` (Rank #${serverRank})` : ''
+    const text = `${playerName} scored ${scoreRef.current} in runrunrunner v-012!${rankText} 🏃`
     try {
       await navigator.clipboard.writeText(text)
       setShareMessage('Copied to clipboard!')
@@ -170,7 +257,7 @@ export function Game({ username, displayName, fid }: GameProps) {
       setShareMessage('Could not copy')
       setTimeout(() => setShareMessage(null), 2000)
     }
-  }, [username, fid])
+  }, [username, fid, serverRank])
 
   // Input event listeners
   useEffect(() => {
@@ -198,7 +285,6 @@ export function Game({ username, displayName, fid }: GameProps) {
     }
 
     // Check if spawning would create impossible pattern
-    // (obstacles in both lanes too close together)
     const recentObstacles = obstacles.filter(o => o.x > width - MIN_OBSTACLE_GAP * 1.5)
     if (recentObstacles.length >= 1) {
       const otherLane = lane === 'floor' ? 'ceiling' : 'floor'
@@ -214,12 +300,9 @@ export function Game({ username, displayName, fid }: GameProps) {
   // Spawn obstacle
   const spawnObstacle = useCallback(() => {
     const { width } = canvasSizeRef.current
-
-    // Randomly pick a lane
     const lane: Lane = Math.random() < 0.5 ? 'floor' : 'ceiling'
 
     if (!canSpawnObstacle(lane)) {
-      // Try other lane
       const otherLane = lane === 'floor' ? 'ceiling' : 'floor'
       if (canSpawnObstacle(otherLane)) {
         obstaclesRef.current.push({
@@ -229,7 +312,6 @@ export function Game({ username, displayName, fid }: GameProps) {
           height: OBSTACLE_HEIGHT,
         })
       }
-      // If neither works, skip this spawn
       return
     }
 
@@ -247,15 +329,12 @@ export function Game({ username, displayName, fid }: GameProps) {
     const playerLane = playerLaneRef.current
 
     for (const obs of obstaclesRef.current) {
-      // Only check obstacles in same lane
       if (obs.lane !== playerLane) continue
 
-      // Check X overlap
       const playerRight = PLAYER_X + PLAYER_WIDTH
       const obsRight = obs.x + obs.width
 
       if (playerRight > obs.x && PLAYER_X < obsRight) {
-        // Check Y overlap
         const obsY = obs.lane === 'floor'
           ? floorYRef.current + (PLAYER_HEIGHT - obs.height)
           : ceilingYRef.current
@@ -281,7 +360,6 @@ export function Game({ username, displayName, fid }: GameProps) {
     if (!ctx) return
 
     const gameLoop = (currentTime: number) => {
-
       const { width, height } = canvasSizeRef.current
 
       // Clear canvas
@@ -300,7 +378,7 @@ export function Game({ username, displayName, fid }: GameProps) {
         scoreRef.current = Math.floor(elapsed / 100)
         setScore(scoreRef.current)
 
-        // Update speed (gradual increase)
+        // Update speed
         speedRef.current = Math.min(MAX_SPEED, BASE_SPEED + elapsed * SPEED_INCREASE_RATE)
 
         // Spawn obstacles
@@ -320,8 +398,6 @@ export function Game({ username, displayName, fid }: GameProps) {
         if (isFlippingRef.current) {
           const flipProgress = Math.min(1, (currentTime - flipStartTimeRef.current) / FLIP_DURATION)
           const startY = playerLaneRef.current === 'ceiling' ? floorYRef.current : ceilingYRef.current
-
-          // Smooth easing
           const eased = 1 - Math.pow(1 - flipProgress, 3)
           playerYRef.current = startY + (targetYRef.current - startY) * eased
 
@@ -346,7 +422,6 @@ export function Game({ username, displayName, fid }: GameProps) {
 
         ctx.fillRect(obs.x, obsY, obs.width, obs.height)
 
-        // Spiky top
         ctx.beginPath()
         ctx.moveTo(obs.x, obsY)
         ctx.lineTo(obs.x + obs.width / 2, obsY - 10)
@@ -359,12 +434,10 @@ export function Game({ username, displayName, fid }: GameProps) {
       ctx.fillStyle = '#3498db'
       ctx.fillRect(PLAYER_X, playerY, PLAYER_WIDTH, PLAYER_HEIGHT)
 
-      // Player details (simple face direction)
       ctx.fillStyle = '#2980b9'
       ctx.fillRect(PLAYER_X + PLAYER_WIDTH - 8, playerY + 8, 6, 6)
       ctx.fillRect(PLAYER_X + PLAYER_WIDTH - 8, playerY + 20, 6, 4)
 
-      // Legs animation
       const legOffset = gameStateRef.current === 'playing' ? Math.sin(currentTime / 50) * 4 : 0
       ctx.fillStyle = '#2980b9'
       ctx.fillRect(PLAYER_X + 5, playerY + PLAYER_HEIGHT, 8, 8 + legOffset)
@@ -460,6 +533,55 @@ export function Game({ username, displayName, fid }: GameProps) {
           <p style={{ marginTop: 20, fontSize: 12, opacity: 0.5 }}>
             Tap or press SPACE to flip lanes
           </p>
+          {submitError && (
+            <p style={{ marginTop: 20, fontSize: 12, color: '#e74c3c' }}>
+              {submitError}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Starting overlay */}
+      {gameState === 'starting' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            color: '#fff',
+            fontFamily: 'monospace',
+          }}
+        >
+          <p style={{ fontSize: 18 }}>Starting...</p>
+        </div>
+      )}
+
+      {/* Submitting overlay */}
+      {gameState === 'submitting' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            color: '#fff',
+            fontFamily: 'monospace',
+          }}
+        >
+          <p style={{ fontSize: 18 }}>Submitting score...</p>
         </div>
       )}
 
@@ -483,33 +605,72 @@ export function Game({ username, displayName, fid }: GameProps) {
         >
           <h1 style={{ margin: 0, fontSize: 32, color: '#e74c3c' }}>Game Over</h1>
           <p style={{ margin: '20px 0 0', fontSize: 24 }}>Score: {score}</p>
+
+          {serverRank !== null && (
+            <p style={{
+              margin: '12px 0 0',
+              fontSize: 18,
+              color: serverRank <= 3 ? '#fbbf24' : '#fff',
+              fontWeight: serverRank <= 3 ? 'bold' : 'normal',
+            }}>
+              {serverRank <= 3 ? `🏆 Rank #${serverRank} - Prize Eligible!` : `Rank #${serverRank}`}
+            </p>
+          )}
+
+          {submitError && (
+            <p style={{ margin: '12px 0 0', fontSize: 12, color: '#e74c3c' }}>
+              {submitError}
+            </p>
+          )}
+
           <p style={{ margin: '8px 0 0', fontSize: 16, opacity: 0.7 }}>Best: {bestScore}</p>
-          <p style={{ marginTop: 40, fontSize: 18, animation: 'pulse 1.5s infinite' }}>
-            Tap to restart
+          <p style={{ marginTop: 30, fontSize: 18, animation: 'pulse 1.5s infinite' }}>
+            Tap to play again
           </p>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleShare()
-            }}
-            onTouchStart={(e) => {
-              e.stopPropagation()
-            }}
-            style={{
-              marginTop: 30,
-              padding: '10px 24px',
-              fontSize: 14,
-              fontFamily: 'monospace',
-              backgroundColor: '#3498db',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 6,
-              cursor: 'pointer',
-            }}
-          >
-            Share
-          </button>
+          <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleShare()
+              }}
+              onTouchStart={(e) => e.stopPropagation()}
+              style={{
+                padding: '10px 24px',
+                fontSize: 14,
+                fontFamily: 'monospace',
+                backgroundColor: '#3498db',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+            >
+              Share
+            </button>
+
+            {onShowLeaderboard && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onShowLeaderboard()
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
+                style={{
+                  padding: '10px 24px',
+                  fontSize: 14,
+                  fontFamily: 'monospace',
+                  backgroundColor: '#8b5cf6',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                }}
+              >
+                Leaderboard
+              </button>
+            )}
+          </div>
 
           {shareMessage && (
             <p style={{ marginTop: 10, fontSize: 12, color: '#2ecc71' }}>
