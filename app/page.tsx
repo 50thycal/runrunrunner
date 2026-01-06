@@ -1,10 +1,25 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { Game } from '@/components/Game'
+import { Lobby } from '@/components/Lobby'
 
 export default function Home() {
-  const { status, user, error, signIn, isInMiniApp } = useAuthSession()
+  const { status, user, error, signIn, signOut, isInMiniApp } = useAuthSession()
+  const [showGame, setShowGame] = useState(false)
+  const [bestScore, setBestScore] = useState(0)
+
+  // Load best score from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('runrunrunner-best')
+    if (stored) {
+      const parsed = parseInt(stored, 10)
+      if (!isNaN(parsed)) {
+        setBestScore(parsed)
+      }
+    }
+  }, [])
 
   // Loading state
   if (status === 'loading') {
@@ -106,6 +121,30 @@ export default function Home() {
     )
   }
 
-  // Signed in - show game with user info
-  return <Game username={user.username} displayName={user.displayName} fid={user.fid} />
+  // Signed in but not playing yet - show lobby
+  if (!showGame) {
+    return (
+      <Lobby
+        username={user.username}
+        displayName={user.displayName}
+        pfpUrl={user.pfpUrl}
+        verified={user.verified}
+        bestScore={bestScore}
+        onPlay={() => setShowGame(true)}
+        onSignOut={() => {
+          setShowGame(false)
+          signOut()
+        }}
+      />
+    )
+  }
+
+  // Playing - show game
+  return (
+    <Game
+      username={user.username}
+      displayName={user.displayName}
+      fid={user.fid}
+    />
+  )
 }

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import sdk from '@farcaster/miniapp-sdk'
-import type { Context } from '@farcaster/miniapp-core'
 
 interface User {
   fid: number
@@ -12,6 +11,8 @@ interface User {
   pfpUrl?: string
   signature?: string
   message?: string
+  verified: boolean
+  verifiedAt?: string
 }
 
 function generateNonce(length = 16): string {
@@ -23,6 +24,37 @@ function generateNonce(length = 16): string {
     result += chars[array[i] % chars.length]
   }
   return result
+}
+
+async function verifyWithServer(fid: number, message: string, signature: string): Promise<{
+  valid: boolean
+  user?: {
+    fid: number
+    username: string
+    displayName: string
+    pfpUrl: string
+    verifiedAt: string
+  }
+  error?: string
+}> {
+  try {
+    const response = await fetch('/api/auth/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fid, message, signature }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { valid: false, error: data.error || 'Verification failed' }
+    }
+
+    return { valid: true, user: data.user }
+  } catch (error) {
+    console.error('Verification request failed:', error)
+    return { valid: false, error: 'Network error during verification' }
+  }
 }
 
 export function useAuthSession() {
@@ -43,7 +75,7 @@ export function useAuthSession() {
     })
   }, [])
 
-  // Load user context when in miniapp
+  // When in miniapp, require explicit sign-in for verification
   useEffect(() => {
     if (isInMiniApp === false) {
       setStatus('signedOut')
@@ -54,38 +86,8 @@ export function useAuthSession() {
       return
     }
 
-    let mounted = true
-
-    async function loadContext() {
-      try {
-        const context: Context.MiniAppContext = await sdk.context
-        if (!mounted) return
-
-        if (context.user?.fid) {
-          setUser({
-            fid: context.user.fid,
-            address: '', // Will be populated on explicit sign-in
-            username: context.user.username,
-            displayName: context.user.displayName,
-            pfpUrl: context.user.pfpUrl,
-          })
-          setStatus('signedIn')
-        } else {
-          setStatus('signedOut')
-        }
-      } catch (err) {
-        if (!mounted) return
-        console.error('Error loading MiniApp context:', err)
-        setError(err instanceof Error ? err.message : 'Failed to load context')
-        setStatus('signedOut')
-      }
-    }
-
-    loadContext()
-
-    return () => {
-      mounted = false
-    }
+    // In miniapp - require explicit sign-in for server verification
+    setStatus('signedOut')
   }, [isInMiniApp])
 
   const signIn = useCallback(async () => {
@@ -116,6 +118,8 @@ export function useAuthSession() {
         throw new Error('Could not parse FID from sign-in message')
       }
 
+      const parsedFid = Number.parseInt(fid, 10)
+
       // Parse address from message
       let addressMatch = result.message.match(/account:\s*(0x[a-fA-F0-9]{40})/)
       if (!addressMatch) {
@@ -123,12 +127,34 @@ export function useAuthSession() {
       }
       const address = addressMatch?.[1] || ''
 
-      setUser({
-        fid: Number.parseInt(fid, 10),
-        address,
-        signature: result.signature,
-        message: result.message,
-      })
+      // Verify with server
+      const verification = await verifyWithServer(parsedFid, result.message, result.signature)
+
+      if (!verification.valid) {
+        // Still allow sign-in but mark as unverified
+        console.warn('Server verification failed:', verification.error)
+        setUser({
+          fid: parsedFid,
+          address,
+          signature: result.signature,
+          message: result.message,
+          verified: false,
+        })
+      } else {
+        // Use verified data from server
+        setUser({
+          fid: verification.user!.fid,
+          address,
+          username: verification.user!.username,
+          displayName: verification.user!.displayName,
+          pfpUrl: verification.user!.pfpUrl,
+          signature: result.signature,
+          message: result.message,
+          verified: true,
+          verifiedAt: verification.user!.verifiedAt,
+        })
+      }
+
       setStatus('signedIn')
     } catch (err) {
       console.error('Sign-in error:', err)
