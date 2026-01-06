@@ -145,6 +145,7 @@ export function validateScoreDuration(score: number, durationMs: number): boolea
 const keys = {
   session: (token: string) => `session:${token}`,
   scores: (contestDay: string) => `scores:${contestDay}`,
+  scoreEntry: (contestDay: string, fid: number) => `score:${contestDay}:${fid}`,
   userBest: (fid: number, contestDay: string) => `user:${fid}:best:${contestDay}`,
   userGames: (fid: number, contestDay: string) => `user:${fid}:games:${contestDay}`,
   payout: (contestDay: string, fid: number) => `payout:${contestDay}:${fid}`,
@@ -265,13 +266,21 @@ export async function submitScore(
     duration,
   }
 
+  // Use fid as the member for consistent add/remove
+  const fidStr = fid.toString()
+
   // Remove old score if exists, then add new one
-  // Using score as the sorted set score for ranking
-  await kv.zrem(scoresKey, fid.toString())
-  await kv.zadd(scoresKey, { score, member: JSON.stringify(entry) })
+  await kv.zrem(scoresKey, fidStr)
+  await kv.zadd(scoresKey, { score, member: fidStr })
+
+  // Store entry details separately (for leaderboard display)
+  const entryKey = keys.scoreEntry(contestDay, fid)
+  await kv.set(entryKey, entry, { ex: 86400 * 2 }) // Expire in 2 days
 
   // Update user's best score
   await kv.set(userBestKey, score, { ex: 86400 * 2 }) // Expire in 2 days
+
+  console.log(`[Submit] Stored score for fid=${fid}, score=${score}, key=${scoresKey}`)
 
   // Get rank
   const rank = await getUserRank(fid, contestDay)
@@ -288,37 +297,57 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
   const day = contestDay || getContestDay()
   const scoresKey = keys.scores(day)
 
-  // Get top scores (highest first)
+  console.log(`[Leaderboard] Fetching from key=${scoresKey}`)
+
+  // Get top scores (highest first) - returns [member, score, member, score, ...]
   const results = await kv.zrange(scoresKey, 0, limit - 1, { rev: true, withScores: true })
+
+  console.log(`[Leaderboard] Raw results count: ${results.length}, results:`, results)
 
   const entries: LeaderboardEntry[] = []
   for (let i = 0; i < results.length; i += 2) {
-    const entryStr = results[i] as string
-    // Score from sorted set (i + 1) is the same as entry.score, skip it
+    const fidStr = results[i] as string
+    const score = results[i + 1] as number
+    const fid = parseInt(fidStr, 10)
 
-    try {
-      const entry = JSON.parse(entryStr) as ScoreEntry
-      entries.push({
-        rank: Math.floor(i / 2) + 1,
-        fid: entry.fid,
-        score: entry.score,
-        username: entry.username,
-        displayName: entry.displayName,
-      })
-    } catch {
-      // Skip malformed entries
+    if (isNaN(fid)) {
+      console.log(`[Leaderboard] Skipping invalid fid: ${fidStr}`)
+      continue
     }
+
+    // Fetch entry details from separate key
+    const entryKey = keys.scoreEntry(day, fid)
+    const entry = await kv.get<ScoreEntry>(entryKey)
+
+    entries.push({
+      rank: Math.floor(i / 2) + 1,
+      fid,
+      score,
+      username: entry?.username,
+      displayName: entry?.displayName,
+    })
   }
 
+  console.log(`[Leaderboard] Returning ${entries.length} entries`)
   return entries
 }
 
 export async function getUserRank(fid: number, contestDay?: string): Promise<number | null> {
+  requireKV()
   const day = contestDay || getContestDay()
-  const leaderboard = await getLeaderboard(day, 100)
+  const scoresKey = keys.scores(day)
 
-  const entry = leaderboard.find((e) => e.fid === fid)
-  return entry?.rank || null
+  // ZREVRANK returns 0-based rank (0 = highest score)
+  const rank = await kv.zrevrank(scoresKey, fid.toString())
+
+  console.log(`[Rank] fid=${fid}, key=${scoresKey}, zrevrank=${rank}`)
+
+  if (rank === null || rank === undefined) {
+    return null
+  }
+
+  // Convert to 1-based rank
+  return rank + 1
 }
 
 export async function getUserStats(fid: number): Promise<UserStats> {
