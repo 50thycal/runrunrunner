@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { submitScore } from '@/lib/contest'
+import { submitScore, KVNotConfiguredError } from '@/lib/contest'
 
 interface SubmitRequest {
   sessionToken: string
@@ -56,8 +56,15 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Game Submit] Error:', error)
 
+    if (error instanceof KVNotConfiguredError) {
+      return NextResponse.json(
+        { ok: false, error: 'KV_NOT_CONFIGURED' },
+        { status: 503 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Failed to submit score' },
+      { ok: false, error: 'Failed to submit score' },
       { status: 500 }
     )
   }

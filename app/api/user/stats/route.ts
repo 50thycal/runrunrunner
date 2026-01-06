@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserStats, CONTEST_CONFIG } from '@/lib/contest'
+import { getUserStats, CONTEST_CONFIG, KVNotConfiguredError } from '@/lib/contest'
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
 
     if (!fidParam) {
       return NextResponse.json(
-        { error: 'Missing fid parameter' },
+        { ok: false, error: 'Missing fid parameter' },
         { status: 400 }
       )
     }
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const fid = parseInt(fidParam, 10)
     if (isNaN(fid)) {
       return NextResponse.json(
-        { error: 'Invalid fid parameter' },
+        { ok: false, error: 'Invalid fid parameter' },
         { status: 400 }
       )
     }
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       : null
 
     return NextResponse.json({
-      success: true,
+      ok: true,
       stats: {
         ...stats,
         isEligible,
@@ -42,8 +42,15 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('[User Stats] Error:', error)
 
+    if (error instanceof KVNotConfiguredError) {
+      return NextResponse.json(
+        { ok: false, error: 'KV_NOT_CONFIGURED' },
+        { status: 503 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Failed to fetch user stats' },
+      { ok: false, error: 'Failed to fetch user stats' },
       { status: 500 }
     )
   }

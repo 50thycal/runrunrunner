@@ -4,6 +4,27 @@ import { base } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
 
 // ============================================================================
+// KV Availability Check
+// ============================================================================
+
+export function isKVConfigured(): boolean {
+  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
+}
+
+export class KVNotConfiguredError extends Error {
+  constructor() {
+    super('KV_NOT_CONFIGURED')
+    this.name = 'KVNotConfiguredError'
+  }
+}
+
+function requireKV(): void {
+  if (!isKVConfigured()) {
+    throw new KVNotConfiguredError()
+  }
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -136,6 +157,7 @@ const keys = {
 // ============================================================================
 
 export async function createGameSession(fid: number): Promise<string> {
+  requireKV()
   const contestDay = getContestDay()
   const gamesKey = keys.userGames(fid, contestDay)
 
@@ -166,6 +188,7 @@ export async function createGameSession(fid: number): Promise<string> {
 }
 
 export async function getGameSession(token: string): Promise<GameSession | null> {
+  requireKV()
   return kv.get<GameSession>(keys.session(token))
 }
 
@@ -190,6 +213,7 @@ export async function submitScore(
   username?: string,
   displayName?: string
 ): Promise<{ success: boolean; error?: string; rank?: number }> {
+  requireKV()
   // Validate session
   const session = await getGameSession(token)
 
@@ -260,6 +284,7 @@ export async function submitScore(
 // ============================================================================
 
 export async function getLeaderboard(contestDay?: string, limit: number = 10): Promise<LeaderboardEntry[]> {
+  requireKV()
   const day = contestDay || getContestDay()
   const scoresKey = keys.scores(day)
 
@@ -297,6 +322,7 @@ export async function getUserRank(fid: number, contestDay?: string): Promise<num
 }
 
 export async function getUserStats(fid: number): Promise<UserStats> {
+  requireKV()
   const contestDay = getContestDay()
 
   const [todayBestScore, gamesPlayedToday] = await Promise.all([

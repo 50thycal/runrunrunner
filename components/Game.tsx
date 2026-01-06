@@ -132,14 +132,21 @@ export function Game({ username, displayName, fid, onShowLeaderboard }: GameProp
 
       if (!response.ok) {
         console.error('Failed to get session:', data.error)
-        setSubmitError(data.error || 'Failed to start game')
+        // Show user-friendly error messages
+        if (data.error === 'KV_NOT_CONFIGURED') {
+          setSubmitError('Server not configured. Please try again later.')
+        } else if (response.status === 429) {
+          setSubmitError(data.error || 'Too many games. Wait a bit.')
+        } else {
+          setSubmitError(data.error || 'Failed to start game')
+        }
         return null
       }
 
       return data.sessionToken
     } catch (error) {
       console.error('Session request error:', error)
-      setSubmitError('Network error')
+      setSubmitError('Network error - check your connection')
       return null
     }
   }, [fid])
@@ -534,9 +541,17 @@ export function Game({ username, displayName, fid, onShowLeaderboard }: GameProp
             Tap or press SPACE to flip lanes
           </p>
           {submitError && (
-            <p style={{ marginTop: 20, fontSize: 12, color: '#e74c3c' }}>
-              {submitError}
-            </p>
+            <div style={{
+              marginTop: 20,
+              padding: '12px 20px',
+              backgroundColor: 'rgba(231, 76, 60, 0.2)',
+              borderRadius: 8,
+              border: '1px solid #e74c3c',
+            }}>
+              <p style={{ margin: 0, fontSize: 14, color: '#e74c3c' }}>
+                {submitError}
+              </p>
+            </div>
           )}
         </div>
       )}

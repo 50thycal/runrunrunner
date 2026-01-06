@@ -51,9 +51,15 @@ export function Lobby({
       const data = await response.json()
       if (response.ok && data.stats) {
         setStats(data.stats)
+      } else if (data.error === 'KV_NOT_CONFIGURED') {
+        // KV not configured - stats unavailable but game can still attempt to play
+        // (will show proper error when trying to start)
+        console.warn('Stats unavailable: KV not configured')
+        setStats(null)
       }
     } catch (error) {
       console.error('Failed to fetch stats:', error)
+      setStats(null)
     } finally {
       setLoadingStats(false)
     }

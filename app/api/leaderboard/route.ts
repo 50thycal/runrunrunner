@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getLeaderboard, getContestDay, CONTEST_CONFIG } from '@/lib/contest'
+import { getLeaderboard, getContestDay, CONTEST_CONFIG, KVNotConfiguredError } from '@/lib/contest'
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     }))
 
     return NextResponse.json({
-      success: true,
+      ok: true,
       contestDay: day,
       leaderboard: withPrizes,
       prizes: CONTEST_CONFIG.PAYOUTS,
@@ -24,8 +24,15 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('[Leaderboard] Error:', error)
 
+    if (error instanceof KVNotConfiguredError) {
+      return NextResponse.json(
+        { ok: false, error: 'KV_NOT_CONFIGURED' },
+        { status: 503 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Failed to fetch leaderboard' },
+      { ok: false, error: 'Failed to fetch leaderboard' },
       { status: 500 }
     )
   }
