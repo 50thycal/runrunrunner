@@ -126,16 +126,32 @@ export function generateSessionToken(): string {
 
 /**
  * Validate that score correlates with duration
+ * Note: Duration from server includes session creation overhead, so we need generous tolerance
  */
 export function validateScoreDuration(score: number, durationMs: number): boolean {
-  if (durationMs < CONTEST_CONFIG.MIN_RUN_DURATION_MS) {
+  console.log(`[Validate] score=${score}, durationMs=${durationMs}`)
+
+  // Minimum duration check (but be lenient - 1 second minimum)
+  if (durationMs < 1000) {
+    console.log(`[Validate] FAIL - duration too short (${durationMs}ms < 1000ms)`)
     return false
   }
 
+  // Expected score = duration / 100 (game loop divides elapsed by 100)
   const expectedScore = Math.floor(durationMs / CONTEST_CONFIG.SCORE_DURATION_RATIO)
-  const tolerance = expectedScore * CONTEST_CONFIG.SCORE_TOLERANCE
 
-  return Math.abs(score - expectedScore) <= tolerance
+  // Very generous tolerance: 50% variance OR at least 50 points
+  // This accounts for network latency, session creation delay, etc.
+  const minTolerance = 50
+  const percentTolerance = expectedScore * 0.5
+  const tolerance = Math.max(minTolerance, percentTolerance)
+
+  const diff = Math.abs(score - expectedScore)
+  const isValid = diff <= tolerance
+
+  console.log(`[Validate] expected=${expectedScore}, tolerance=${tolerance}, diff=${diff}, valid=${isValid}`)
+
+  return isValid
 }
 
 // ============================================================================
@@ -269,9 +285,18 @@ export async function submitScore(
   // Use fid as the member for consistent add/remove
   const fidStr = fid.toString()
 
+  console.log(`[Submit] About to zadd: key=${scoresKey}, score=${score}, member=${fidStr}, memberType=${typeof fidStr}`)
+
   // Remove old score if exists, then add new one
   await kv.zrem(scoresKey, fidStr)
-  await kv.zadd(scoresKey, { score, member: fidStr })
+
+  // Use explicit object format for zadd
+  const zaddResult = await kv.zadd(scoresKey, { score: score, member: fidStr })
+  console.log(`[Submit] zadd result: ${zaddResult}`)
+
+  // Verify what was stored
+  const storedRank = await kv.zrevrank(scoresKey, fidStr)
+  console.log(`[Submit] Verification - zrevrank for ${fidStr}: ${storedRank}`)
 
   // Store entry details separately (for leaderboard display)
   const entryKey = keys.scoreEntry(contestDay, fid)
@@ -302,12 +327,35 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
   // Get top scores (highest first) - returns [member, score, member, score, ...]
   const results = await kv.zrange(scoresKey, 0, limit - 1, { rev: true, withScores: true })
 
-  console.log(`[Leaderboard] Raw results count: ${results.length}, results:`, results)
+  console.log(`[Leaderboard] Raw results count: ${results.length}`)
+  console.log(`[Leaderboard] Raw results:`, JSON.stringify(results))
 
   const entries: LeaderboardEntry[] = []
   for (let i = 0; i < results.length; i += 2) {
-    const fidStr = results[i] as string
-    const score = results[i + 1] as number
+    const rawMember = results[i]
+    const rawScore = results[i + 1]
+
+    console.log(`[Leaderboard] Entry ${i/2}: rawMember=${JSON.stringify(rawMember)}, rawScore=${rawScore}, memberType=${typeof rawMember}`)
+
+    // Handle member - could be string or object depending on how it was stored
+    let fidStr: string
+    if (typeof rawMember === 'string') {
+      fidStr = rawMember
+    } else if (typeof rawMember === 'object' && rawMember !== null) {
+      // If it's an object (e.g., from old buggy zadd), try to extract fid
+      const obj = rawMember as Record<string, unknown>
+      if ('fid' in obj && typeof obj.fid === 'number') {
+        fidStr = obj.fid.toString()
+      } else {
+        console.log(`[Leaderboard] Skipping corrupt entry (object without fid): ${JSON.stringify(rawMember)}`)
+        continue
+      }
+    } else {
+      console.log(`[Leaderboard] Skipping unknown member type: ${typeof rawMember}`)
+      continue
+    }
+
+    const score = typeof rawScore === 'number' ? rawScore : parseFloat(String(rawScore))
     const fid = parseInt(fidStr, 10)
 
     if (isNaN(fid)) {
