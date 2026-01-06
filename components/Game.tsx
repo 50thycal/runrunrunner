@@ -25,7 +25,13 @@ const SPEED_INCREASE_RATE = 0.0005
 const BASE_SPAWN_INTERVAL = 1500 // ms
 const MIN_SPAWN_INTERVAL = 600 // ms
 
-export function Game() {
+interface GameProps {
+  username?: string
+  displayName?: string
+  fid: number
+}
+
+export function Game({ username, displayName, fid }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [gameState, setGameState] = useState<GameState>('idle')
@@ -154,7 +160,8 @@ export function Game() {
 
   // Share handler
   const handleShare = useCallback(async () => {
-    const text = `I scored ${scoreRef.current} in runrunrunner v-012`
+    const playerName = username ? `@${username}` : `FID:${fid}`
+    const text = `${playerName} scored ${scoreRef.current} in runrunrunner v-012! 🏃`
     try {
       await navigator.clipboard.writeText(text)
       setShareMessage('Copied to clipboard!')
@@ -163,7 +170,7 @@ export function Game() {
       setShareMessage('Could not copy')
       setTimeout(() => setShareMessage(null), 2000)
     }
-  }, [])
+  }, [username, fid])
 
   // Input event listeners
   useEffect(() => {
@@ -442,6 +449,11 @@ export function Game() {
         >
           <h1 style={{ margin: 0, fontSize: 28 }}>runrunrunner</h1>
           <p style={{ margin: '8px 0 0', opacity: 0.7 }}>v-012</p>
+          {(username || displayName) && (
+            <p style={{ marginTop: 16, fontSize: 14, color: '#8b5cf6' }}>
+              Playing as {displayName || `@${username}`}
+            </p>
+          )}
           <p style={{ marginTop: 40, fontSize: 18, animation: 'pulse 1.5s infinite' }}>
             Tap to start
           </p>
