@@ -129,11 +129,8 @@ export function generateSessionToken(): string {
  * Note: Duration from server includes session creation overhead, so we need generous tolerance
  */
 export function validateScoreDuration(score: number, durationMs: number): boolean {
-  console.log(`[Validate] score=${score}, durationMs=${durationMs}`)
-
   // Minimum duration check (but be lenient - 1 second minimum)
   if (durationMs < 1000) {
-    console.log(`[Validate] FAIL - duration too short (${durationMs}ms < 1000ms)`)
     return false
   }
 
@@ -147,11 +144,7 @@ export function validateScoreDuration(score: number, durationMs: number): boolea
   const tolerance = Math.max(minTolerance, percentTolerance)
 
   const diff = Math.abs(score - expectedScore)
-  const isValid = diff <= tolerance
-
-  console.log(`[Validate] expected=${expectedScore}, tolerance=${tolerance}, diff=${diff}, valid=${isValid}`)
-
-  return isValid
+  return diff <= tolerance
 }
 
 // ============================================================================
@@ -285,18 +278,9 @@ export async function submitScore(
   // Use fid as the member for consistent add/remove
   const fidStr = fid.toString()
 
-  console.log(`[Submit] About to zadd: key=${scoresKey}, score=${score}, member=${fidStr}, memberType=${typeof fidStr}`)
-
   // Remove old score if exists, then add new one
   await kv.zrem(scoresKey, fidStr)
-
-  // Use explicit object format for zadd
-  const zaddResult = await kv.zadd(scoresKey, { score: score, member: fidStr })
-  console.log(`[Submit] zadd result: ${zaddResult}`)
-
-  // Verify what was stored
-  const storedRank = await kv.zrevrank(scoresKey, fidStr)
-  console.log(`[Submit] Verification - zrevrank for ${fidStr}: ${storedRank}`)
+  await kv.zadd(scoresKey, { score: score, member: fidStr })
 
   // Store entry details separately (for leaderboard display)
   const entryKey = keys.scoreEntry(contestDay, fid)
@@ -304,8 +288,6 @@ export async function submitScore(
 
   // Update user's best score
   await kv.set(userBestKey, score, { ex: 86400 * 2 }) // Expire in 2 days
-
-  console.log(`[Submit] Stored score for fid=${fid}, score=${score}, key=${scoresKey}`)
 
   // Get rank
   const rank = await getUserRank(fid, contestDay)
@@ -322,20 +304,13 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
   const day = contestDay || getContestDay()
   const scoresKey = keys.scores(day)
 
-  console.log(`[Leaderboard] Fetching from key=${scoresKey}`)
-
   // Get top scores (highest first) - returns [member, score, member, score, ...]
   const results = await kv.zrange(scoresKey, 0, limit - 1, { rev: true, withScores: true })
-
-  console.log(`[Leaderboard] Raw results count: ${results.length}`)
-  console.log(`[Leaderboard] Raw results:`, JSON.stringify(results))
 
   const entries: LeaderboardEntry[] = []
   for (let i = 0; i < results.length; i += 2) {
     const rawMember = results[i]
     const rawScore = results[i + 1]
-
-    console.log(`[Leaderboard] Entry ${i/2}: rawMember=${JSON.stringify(rawMember)}, rawScore=${rawScore}, memberType=${typeof rawMember}`)
 
     // Handle member - could be string or object depending on how it was stored
     let fid: number
@@ -345,10 +320,7 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
     if (typeof rawMember === 'string') {
       // New format: member is just the fid string
       fid = parseInt(rawMember, 10)
-      if (isNaN(fid)) {
-        console.log(`[Leaderboard] Skipping invalid fid string: ${rawMember}`)
-        continue
-      }
+      if (isNaN(fid)) continue
       // Fetch entry details from separate key
       const entryKey = keys.scoreEntry(day, fid)
       const entry = await kv.get<ScoreEntry>(entryKey)
@@ -362,11 +334,9 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
         username = typeof obj.username === 'string' ? obj.username : undefined
         displayName = typeof obj.displayName === 'string' ? obj.displayName : undefined
       } else {
-        console.log(`[Leaderboard] Skipping corrupt entry (object without fid): ${JSON.stringify(rawMember)}`)
         continue
       }
     } else {
-      console.log(`[Leaderboard] Skipping unknown member type: ${typeof rawMember}`)
       continue
     }
 
@@ -381,7 +351,6 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
     })
   }
 
-  console.log(`[Leaderboard] Returning ${entries.length} entries`)
   return entries
 }
 
@@ -392,11 +361,7 @@ export async function getUserRank(fid: number, contestDay?: string): Promise<num
   const leaderboard = await getLeaderboard(day, 100)
 
   const entry = leaderboard.find((e) => e.fid === fid)
-  const rank = entry?.rank ?? null
-
-  console.log(`[Rank] fid=${fid}, day=${day}, found=${!!entry}, rank=${rank}`)
-
-  return rank
+  return entry?.rank ?? null
 }
 
 export async function getUserStats(fid: number): Promise<UserStats> {
