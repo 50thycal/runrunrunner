@@ -90,9 +90,12 @@ export const CONTEST_CONFIG = {
   MAX_GAMES_PER_HOUR: 10,
   MIN_RUN_DURATION_MS: 3000, // Minimum 3 seconds to submit
   SCORE_DURATION_RATIO: 100, // Score ≈ duration_ms / 100
-  SCORE_TOLERANCE: 0.3, // Allow 30% variance from expected score
+  SCORE_TOLERANCE: 0.15, // Allow only 15% variance (tightened from 30%)
+  MAX_SCORE_TOLERANCE: 20, // Maximum absolute tolerance in points
   // Safety
   DAILY_PAYOUT_CAP_ETH: '0.00005', // ~$0.125 max per day (small buffer)
+  // Maximum possible score (prevents absurd submissions)
+  MAX_SCORE: 10000, // ~16 minutes of perfect play
 }
 
 // ============================================================================
@@ -127,25 +130,51 @@ export function generateSessionToken(): string {
 
 /**
  * Validate that score correlates with duration
- * Note: Duration from server includes session creation overhead, so we need generous tolerance
+ * SECURITY: Strict validation to prevent score cheating
  */
 export function validateScoreDuration(score: number, durationMs: number): boolean {
-  // Minimum duration check (but be lenient - 1 second minimum)
+  // Minimum duration check - at least 1 second
   if (durationMs < 1000) {
+    console.log('[Anti-cheat] Rejected: duration too short', { durationMs, score })
+    return false
+  }
+
+  // Maximum score check - prevent absurd submissions
+  if (score > CONTEST_CONFIG.MAX_SCORE) {
+    console.log('[Anti-cheat] Rejected: score exceeds maximum', { score, max: CONTEST_CONFIG.MAX_SCORE })
+    return false
+  }
+
+  // Score cannot be negative
+  if (score < 0) {
+    console.log('[Anti-cheat] Rejected: negative score', { score })
     return false
   }
 
   // Expected score = duration / 100 (game loop divides elapsed by 100)
   const expectedScore = Math.floor(durationMs / CONTEST_CONFIG.SCORE_DURATION_RATIO)
 
-  // Very generous tolerance: 50% variance OR at least 50 points
-  // This accounts for network latency, session creation delay, etc.
-  const minTolerance = 50
-  const percentTolerance = expectedScore * 0.5
-  const tolerance = Math.max(minTolerance, percentTolerance)
+  // STRICT tolerance: 15% variance with max of 20 points
+  // This is tight enough to prevent major cheating but allows for network latency
+  const percentTolerance = Math.floor(expectedScore * CONTEST_CONFIG.SCORE_TOLERANCE)
+  const tolerance = Math.min(percentTolerance, CONTEST_CONFIG.MAX_SCORE_TOLERANCE)
+  // Allow at least 5 points tolerance for very short games
+  const finalTolerance = Math.max(5, tolerance)
 
   const diff = Math.abs(score - expectedScore)
-  return diff <= tolerance
+
+  if (diff > finalTolerance) {
+    console.log('[Anti-cheat] Rejected: score/duration mismatch', {
+      score,
+      expectedScore,
+      diff,
+      tolerance: finalTolerance,
+      durationMs,
+    })
+    return false
+  }
+
+  return true
 }
 
 // ============================================================================
