@@ -30,10 +30,11 @@ interface GameProps {
   username?: string
   displayName?: string
   fid: number
+  authToken: string // Required auth token for authenticated API requests
   onShowLeaderboard?: () => void
 }
 
-export function Game({ username, displayName, fid, onShowLeaderboard }: GameProps) {
+export function Game({ username, displayName, fid, authToken, onShowLeaderboard }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [gameState, setGameState] = useState<GameState>('idle')
@@ -125,7 +126,10 @@ export function Game({ username, displayName, fid, onShowLeaderboard }: GameProp
     try {
       const response = await fetch('/api/game/start', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
         body: JSON.stringify({ fid }),
       })
 
@@ -150,7 +154,7 @@ export function Game({ username, displayName, fid, onShowLeaderboard }: GameProp
       setSubmitError('Network error - check your connection')
       return null
     }
-  }, [fid])
+  }, [fid, authToken])
 
   // Submit score to server
   const submitScore = useCallback(async (finalScore: number, token: string) => {

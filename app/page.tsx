@@ -171,6 +171,7 @@ export default function Home() {
       username={user.username}
       displayName={user.displayName}
       fid={user.fid}
+      authToken={user.authToken!}
       onShowLeaderboard={() => setShowLeaderboard(true)}
     />
   )
