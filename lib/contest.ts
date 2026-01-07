@@ -321,6 +321,7 @@ export async function submitScore(
 
   // Get rank
   const rank = await getUserRank(fid, contestDay)
+  console.log(`[submitScore] FID ${fid} submitted score ${score}, got rank: ${rank}`)
 
   return { success: true, rank: rank ?? undefined }
 }
@@ -415,7 +416,22 @@ export async function getUserRank(fid: number, contestDay?: string): Promise<num
   const day = contestDay || getContestDay()
   const leaderboard = await getLeaderboard(day, 100)
 
-  const entry = leaderboard.find((e) => e.fid === fid)
+  console.log(`[getUserRank] Looking for FID ${fid} (type: ${typeof fid}) in ${leaderboard.length} entries`)
+
+  const entry = leaderboard.find((e) => {
+    const match = e.fid === fid
+    if (!match && e.fid.toString() === fid.toString()) {
+      console.log(`[getUserRank] Type mismatch: entry.fid=${e.fid} (${typeof e.fid}) vs fid=${fid} (${typeof fid})`)
+    }
+    return match
+  })
+
+  if (entry) {
+    console.log(`[getUserRank] Found entry: rank=${entry.rank}, fid=${entry.fid}`)
+  } else {
+    console.log(`[getUserRank] Entry not found. Leaderboard FIDs:`, leaderboard.map(e => `${e.fid}(${typeof e.fid})`).join(', '))
+  }
+
   return entry?.rank ?? null
 }
 
