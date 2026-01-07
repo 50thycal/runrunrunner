@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createGameSession, getContestDay, CONTEST_CONFIG, KVNotConfiguredError } from '@/lib/contest'
+import { verifyAuthToken, getAuthToken } from '@/lib/auth'
 
 interface StartRequest {
   fid: number
@@ -7,6 +8,17 @@ interface StartRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication
+    const authToken = getAuthToken(request)
+    const authSession = await verifyAuthToken(authToken)
+
+    if (!authSession) {
+      return NextResponse.json(
+        { ok: false, error: 'Authentication required. Please sign in first.' },
+        { status: 401 }
+      )
+    }
+
     const body: StartRequest = await request.json()
     const { fid } = body
 
@@ -14,6 +26,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { ok: false, error: 'Missing or invalid fid' },
         { status: 400 }
+      )
+    }
+
+    // CRITICAL: Verify the FID matches the authenticated user
+    if (fid !== authSession.fid) {
+      return NextResponse.json(
+        { ok: false, error: 'FID does not match authenticated user' },
+        { status: 403 }
       )
     }
 

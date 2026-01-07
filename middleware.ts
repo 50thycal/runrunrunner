@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Simple in-memory rate limiter for API routes
-// In production with multiple instances, use Redis/KV for distributed rate limiting
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+import { kv } from '@vercel/kv'
 
 // Rate limit configuration
-const RATE_LIMIT_WINDOW_MS = 60 * 1000 // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 100 // 100 requests per minute per IP
+const RATE_LIMIT_WINDOW_SECONDS = 60 // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 60 // 60 requests per minute per IP (reduced from 100)
 
 // Allowed origins for CORS
 const ALLOWED_ORIGINS = [
@@ -16,45 +13,78 @@ const ALLOWED_ORIGINS = [
   /^https:\/\/.*\.warpcast\.com$/,
 ]
 
+/**
+ * Get the real client IP from trusted Vercel headers
+ * SECURITY: Only trust Vercel's x-forwarded-for header, not arbitrary headers
+ */
 function getClientIp(request: NextRequest): string {
-  // Check various headers for the real IP (Vercel, Cloudflare, etc.)
+  // On Vercel, x-forwarded-for is set by Vercel's edge and can be trusted
+  // The leftmost IP is the original client IP
   const forwardedFor = request.headers.get('x-forwarded-for')
   if (forwardedFor) {
-    return forwardedFor.split(',')[0].trim()
-  }
-  const realIp = request.headers.get('x-real-ip')
-  if (realIp) {
-    return realIp
-  }
-  // Fallback
-  return 'unknown'
-}
-
-function checkRateLimit(ip: string): { allowed: boolean; remaining: number; resetIn: number } {
-  const now = Date.now()
-  const record = rateLimitMap.get(ip)
-
-  // Clean up old entries periodically
-  if (rateLimitMap.size > 10000) {
-    for (const [key, value] of rateLimitMap.entries()) {
-      if (value.resetTime < now) {
-        rateLimitMap.delete(key)
-      }
+    // Take the first (leftmost) IP - this is the original client
+    const clientIp = forwardedFor.split(',')[0].trim()
+    // Validate it looks like an IP address
+    if (/^[\d.:a-fA-F]+$/.test(clientIp)) {
+      return clientIp
     }
   }
 
-  if (!record || record.resetTime < now) {
-    // New window
-    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS })
-    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, resetIn: RATE_LIMIT_WINDOW_MS }
+  // Vercel also sets x-real-ip
+  const realIp = request.headers.get('x-real-ip')
+  if (realIp && /^[\d.:a-fA-F]+$/.test(realIp)) {
+    return realIp
   }
 
-  if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return { allowed: false, remaining: 0, resetIn: record.resetTime - now }
-  }
+  // Fallback - use a hash of other identifying info
+  const ua = request.headers.get('user-agent') || ''
+  return `unknown-${hashString(ua).substring(0, 8)}`
+}
 
-  record.count++
-  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - record.count, resetIn: record.resetTime - now }
+function hashString(str: string): string {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  return Math.abs(hash).toString(16)
+}
+
+/**
+ * Distributed rate limiting using Vercel KV
+ * Uses a sliding window approach
+ */
+async function checkRateLimitDistributed(ip: string): Promise<{ allowed: boolean; remaining: number; resetIn: number }> {
+  const key = `ratelimit:${ip}`
+
+  try {
+    // Use INCR with EXPIRE for atomic rate limiting
+    const count = await kv.incr(key)
+
+    // Set expiry only on first request (when count is 1)
+    if (count === 1) {
+      await kv.expire(key, RATE_LIMIT_WINDOW_SECONDS)
+    }
+
+    // Get TTL for reset time
+    const ttl = await kv.ttl(key)
+    const resetIn = ttl > 0 ? ttl * 1000 : RATE_LIMIT_WINDOW_SECONDS * 1000
+
+    if (count > RATE_LIMIT_MAX_REQUESTS) {
+      return { allowed: false, remaining: 0, resetIn }
+    }
+
+    return {
+      allowed: true,
+      remaining: Math.max(0, RATE_LIMIT_MAX_REQUESTS - count),
+      resetIn,
+    }
+  } catch (error) {
+    // If KV fails, allow the request but log the error
+    console.error('[RateLimit] KV error:', error)
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS, resetIn: RATE_LIMIT_WINDOW_SECONDS * 1000 }
+  }
 }
 
 function isOriginAllowed(origin: string | null): boolean {
@@ -68,7 +98,7 @@ function isOriginAllowed(origin: string | null): boolean {
   })
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Only apply middleware to API routes
@@ -81,13 +111,19 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Skip rate limiting for health check
+  if (pathname === '/api/health') {
+    return NextResponse.next()
+  }
+
   const ip = getClientIp(request)
   const origin = request.headers.get('origin')
 
-  // Check rate limit
-  const { allowed, remaining, resetIn } = checkRateLimit(ip)
+  // Check distributed rate limit
+  const { allowed, remaining, resetIn } = await checkRateLimitDistributed(ip)
 
   if (!allowed) {
+    console.log(`[RateLimit] Blocked IP: ${ip}, path: ${pathname}`)
     return new NextResponse(
       JSON.stringify({ error: 'Too many requests. Please try again later.' }),
       {
