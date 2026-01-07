@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import sdk from '@farcaster/miniapp-sdk'
 
 type GameState = 'idle' | 'starting' | 'playing' | 'gameover' | 'submitting'
 type Lane = 'floor' | 'ceiling'
@@ -251,20 +252,44 @@ export function Game({ username, displayName, fid, onShowLeaderboard }: GameProp
     // Ignore input during 'starting' and 'submitting' states
   }, [startGame, flip])
 
-  // Share handler
+  // Share handler - opens Farcaster composer with frame
   const handleShare = useCallback(async () => {
-    const playerName = username ? `@${username}` : `FID:${fid}`
-    const rankText = serverRank ? ` (Rank #${serverRank})` : ''
-    const text = `${playerName} scored ${scoreRef.current} in runrunrunner v-012!${rankText} 🏃`
+    const currentScore = scoreRef.current
+    const rankText = serverRank ? ` Rank #${serverRank} today!` : ''
+
+    // Build frame URL with score data
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    const frameParams = new URLSearchParams({
+      score: currentScore.toString(),
+      username: username || 'Anonymous',
+    })
+    if (serverRank) frameParams.set('rank', serverRank.toString())
+    const frameUrl = `${baseUrl}/api/frame?${frameParams.toString()}`
+
+    // Compose text for the cast
+    const text = `I scored ${currentScore} in runrunrunner! 🏃${rankText}\n\nCan you beat my score?`
+
     try {
-      await navigator.clipboard.writeText(text)
-      setShareMessage('Copied to clipboard!')
+      // Use Farcaster SDK to open composer with frame embed
+      await sdk.actions.composeCast({
+        text,
+        embeds: [frameUrl],
+      })
+      setShareMessage('Opening composer...')
       setTimeout(() => setShareMessage(null), 2000)
-    } catch {
-      setShareMessage('Could not copy')
-      setTimeout(() => setShareMessage(null), 2000)
+    } catch (error) {
+      console.error('Share error:', error)
+      // Fallback to clipboard
+      try {
+        await navigator.clipboard.writeText(`${text}\n\n${frameUrl}`)
+        setShareMessage('Copied to clipboard!')
+        setTimeout(() => setShareMessage(null), 2000)
+      } catch {
+        setShareMessage('Could not share')
+        setTimeout(() => setShareMessage(null), 2000)
+      }
     }
-  }, [username, fid, serverRank])
+  }, [username, serverRank])
 
   // Input event listeners
   useEffect(() => {
