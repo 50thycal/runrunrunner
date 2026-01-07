@@ -78,11 +78,12 @@ export interface UserStats {
 // ============================================================================
 
 export const CONTEST_CONFIG = {
-  // Payout amounts in ETH (test scale ~$0.05, $0.03, $0.02)
+  // Payout amounts in ETH (~$0.10 total daily at ~$2500/ETH)
+  // 1st: $0.06, 2nd: $0.03, 3rd: $0.01
   PAYOUTS: [
-    { rank: 1, amount: '0.00002' }, // ~$0.05 at $2500/ETH
+    { rank: 1, amount: '0.000024' }, // ~$0.06
     { rank: 2, amount: '0.000012' }, // ~$0.03
-    { rank: 3, amount: '0.000008' }, // ~$0.02
+    { rank: 3, amount: '0.000004' }, // ~$0.01
   ],
   // Anti-cheat
   SESSION_EXPIRY_MS: 10 * 60 * 1000, // 10 minutes
@@ -91,7 +92,7 @@ export const CONTEST_CONFIG = {
   SCORE_DURATION_RATIO: 100, // Score ≈ duration_ms / 100
   SCORE_TOLERANCE: 0.3, // Allow 30% variance from expected score
   // Safety
-  DAILY_PAYOUT_CAP_ETH: '0.001', // Max 0.001 ETH per day total
+  DAILY_PAYOUT_CAP_ETH: '0.00005', // ~$0.125 max per day (small buffer)
 }
 
 // ============================================================================
