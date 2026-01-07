@@ -16,7 +16,7 @@
     "@farcaster/miniapp-sdk": "^0.2.1",
     "@neynar/nodejs-sdk": "^2.11.2",
     "@vercel/kv": "^3.0.0",
-    "next": "15.1.11",
+    "next": "^16.1.1",
     "openai": "^4.77.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
