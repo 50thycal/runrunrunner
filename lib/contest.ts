@@ -338,14 +338,29 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
     console.log(`[Leaderboard] Entry ${i/2}: rawMember=${JSON.stringify(rawMember)}, rawScore=${rawScore}, memberType=${typeof rawMember}`)
 
     // Handle member - could be string or object depending on how it was stored
-    let fidStr: string
+    let fid: number
+    let username: string | undefined
+    let displayName: string | undefined
+
     if (typeof rawMember === 'string') {
-      fidStr = rawMember
+      // New format: member is just the fid string
+      fid = parseInt(rawMember, 10)
+      if (isNaN(fid)) {
+        console.log(`[Leaderboard] Skipping invalid fid string: ${rawMember}`)
+        continue
+      }
+      // Fetch entry details from separate key
+      const entryKey = keys.scoreEntry(day, fid)
+      const entry = await kv.get<ScoreEntry>(entryKey)
+      username = entry?.username
+      displayName = entry?.displayName
     } else if (typeof rawMember === 'object' && rawMember !== null) {
-      // If it's an object (e.g., from old buggy zadd), try to extract fid
+      // Old format: member is a JSON blob with fid, username, displayName, etc.
       const obj = rawMember as Record<string, unknown>
       if ('fid' in obj && typeof obj.fid === 'number') {
-        fidStr = obj.fid.toString()
+        fid = obj.fid
+        username = typeof obj.username === 'string' ? obj.username : undefined
+        displayName = typeof obj.displayName === 'string' ? obj.displayName : undefined
       } else {
         console.log(`[Leaderboard] Skipping corrupt entry (object without fid): ${JSON.stringify(rawMember)}`)
         continue
@@ -356,23 +371,13 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
     }
 
     const score = typeof rawScore === 'number' ? rawScore : parseFloat(String(rawScore))
-    const fid = parseInt(fidStr, 10)
-
-    if (isNaN(fid)) {
-      console.log(`[Leaderboard] Skipping invalid fid: ${fidStr}`)
-      continue
-    }
-
-    // Fetch entry details from separate key
-    const entryKey = keys.scoreEntry(day, fid)
-    const entry = await kv.get<ScoreEntry>(entryKey)
 
     entries.push({
       rank: Math.floor(i / 2) + 1,
       fid,
       score,
-      username: entry?.username,
-      displayName: entry?.displayName,
+      username,
+      displayName,
     })
   }
 
