@@ -343,12 +343,20 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
     const rawMember = results[i]
     const rawScore = results[i + 1]
 
-    // Handle member - could be string, JSON string, or object depending on how it was stored
+    // Handle member - could be number, string, JSON string, or object depending on how KV returns it
     let fid: number
     let username: string | undefined
     let displayName: string | undefined
 
-    if (typeof rawMember === 'string') {
+    if (typeof rawMember === 'number') {
+      // KV returned the member as a number directly (FID)
+      fid = rawMember
+      // Fetch entry details from separate key
+      const entryKey = keys.scoreEntry(day, fid)
+      const entry = await kv.get<ScoreEntry>(entryKey)
+      username = entry?.username
+      displayName = entry?.displayName
+    } else if (typeof rawMember === 'string') {
       // Could be either a plain FID string or a JSON string
       const trimmed = rawMember.trim()
       if (trimmed.startsWith('{')) {
