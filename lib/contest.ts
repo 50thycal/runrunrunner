@@ -342,31 +342,56 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
     const rawMember = results[i]
     const rawScore = results[i + 1]
 
-    // Handle member - could be string or object depending on how it was stored
+    // Handle member - could be string, JSON string, or object depending on how it was stored
     let fid: number
     let username: string | undefined
     let displayName: string | undefined
 
     if (typeof rawMember === 'string') {
-      // New format: member is just the fid string
-      fid = parseInt(rawMember, 10)
-      if (isNaN(fid)) continue
-      // Fetch entry details from separate key
-      const entryKey = keys.scoreEntry(day, fid)
-      const entry = await kv.get<ScoreEntry>(entryKey)
-      username = entry?.username
-      displayName = entry?.displayName
+      // Could be either a plain FID string or a JSON string
+      const trimmed = rawMember.trim()
+      if (trimmed.startsWith('{')) {
+        // JSON string - parse it
+        try {
+          const parsed = JSON.parse(trimmed)
+          if (typeof parsed.fid === 'number') {
+            fid = parsed.fid
+            username = typeof parsed.username === 'string' ? parsed.username : undefined
+            displayName = typeof parsed.displayName === 'string' ? parsed.displayName : undefined
+          } else {
+            console.log('[Leaderboard] Skipping malformed JSON member:', trimmed)
+            continue
+          }
+        } catch {
+          console.log('[Leaderboard] Failed to parse JSON member:', trimmed)
+          continue
+        }
+      } else {
+        // Plain FID string (new format)
+        fid = parseInt(trimmed, 10)
+        if (isNaN(fid)) {
+          console.log('[Leaderboard] Skipping non-numeric member:', trimmed)
+          continue
+        }
+        // Fetch entry details from separate key
+        const entryKey = keys.scoreEntry(day, fid)
+        const entry = await kv.get<ScoreEntry>(entryKey)
+        username = entry?.username
+        displayName = entry?.displayName
+      }
     } else if (typeof rawMember === 'object' && rawMember !== null) {
-      // Old format: member is a JSON blob with fid, username, displayName, etc.
+      // Object format (old format, auto-parsed by KV)
       const obj = rawMember as Record<string, unknown>
       if ('fid' in obj && typeof obj.fid === 'number') {
         fid = obj.fid
         username = typeof obj.username === 'string' ? obj.username : undefined
         displayName = typeof obj.displayName === 'string' ? obj.displayName : undefined
       } else {
+        console.log('[Leaderboard] Skipping object without valid fid:', obj)
         continue
       }
     } else {
+      console.log('[Leaderboard] Skipping unknown member type:', typeof rawMember, rawMember)
       continue
     }
 
