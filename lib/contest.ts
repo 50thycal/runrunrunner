@@ -130,7 +130,7 @@ export function generateSessionToken(): string {
 
 /**
  * Validate that score correlates with duration
- * SECURITY: Strict validation to prevent score cheating
+ * SECURITY: Validation to prevent score cheating while allowing for normal timing variance
  */
 export function validateScoreDuration(score: number, durationMs: number): boolean {
   // Minimum duration check - at least 1 second
@@ -154,21 +154,41 @@ export function validateScoreDuration(score: number, durationMs: number): boolea
   // Expected score = duration / 100 (game loop divides elapsed by 100)
   const expectedScore = Math.floor(durationMs / CONTEST_CONFIG.SCORE_DURATION_RATIO)
 
-  // STRICT tolerance: 15% variance with max of 20 points
-  // This is tight enough to prevent major cheating but allows for network latency
-  const percentTolerance = Math.floor(expectedScore * CONTEST_CONFIG.SCORE_TOLERANCE)
-  const tolerance = Math.min(percentTolerance, CONTEST_CONFIG.MAX_SCORE_TOLERANCE)
-  // Allow at least 5 points tolerance for very short games
-  const finalTolerance = Math.max(5, tolerance)
+  // Account for startup overhead: the server records startTime when session is created,
+  // but the client doesn't start the game loop until after receiving the response.
+  // This can add 1-2 seconds of discrepancy, especially on slow connections.
+  // So we allow the score to be LOWER than expected by a startup buffer.
+  const STARTUP_OVERHEAD_MS = 2000 // Allow up to 2 seconds of startup overhead
+  const startupBuffer = Math.floor(STARTUP_OVERHEAD_MS / CONTEST_CONFIG.SCORE_DURATION_RATIO) // 20 points
 
-  const diff = Math.abs(score - expectedScore)
+  // For scores LOWER than expected (normal case due to startup overhead):
+  // Allow a generous buffer
+  if (score < expectedScore) {
+    const allowedDiff = startupBuffer + Math.floor(expectedScore * 0.1) // startup buffer + 10%
+    const diff = expectedScore - score
+    if (diff > allowedDiff) {
+      console.log('[Anti-cheat] Rejected: score too low for duration', {
+        score,
+        expectedScore,
+        diff,
+        allowedDiff,
+        durationMs,
+      })
+      return false
+    }
+    return true
+  }
 
-  if (diff > finalTolerance) {
-    console.log('[Anti-cheat] Rejected: score/duration mismatch', {
+  // For scores HIGHER than expected (potential cheating):
+  // Be stricter - only allow 10% or 10 points max
+  const maxOverage = Math.max(10, Math.floor(expectedScore * 0.1))
+  const overage = score - expectedScore
+  if (overage > maxOverage) {
+    console.log('[Anti-cheat] Rejected: score too high for duration', {
       score,
       expectedScore,
-      diff,
-      tolerance: finalTolerance,
+      overage,
+      maxOverage,
       durationMs,
     })
     return false
