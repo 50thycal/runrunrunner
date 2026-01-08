@@ -179,7 +179,7 @@ export function Lobby({
         <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 12 }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 16 }}>🥇</div>
-            <div style={{ fontSize: 11, color: '#fbbf24' }}>~$0.05</div>
+            <div style={{ fontSize: 11, color: '#fbbf24' }}>~$0.06</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 16 }}>🥈</div>
@@ -187,7 +187,7 @@ export function Lobby({
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 16 }}>🥉</div>
-            <div style={{ fontSize: 11, color: '#cd7f32' }}>~$0.02</div>
+            <div style={{ fontSize: 11, color: '#cd7f32' }}>~$0.01</div>
           </div>
         </div>
 
