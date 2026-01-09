@@ -6,7 +6,7 @@
   "crons": [
     {
       "path": "/api/cron/payout",
-      "schedule": "10 18 * * *"
+      "schedule": "5 0 * * *"
     }
   ]
 }

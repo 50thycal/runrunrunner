@@ -465,19 +465,47 @@ export function Game({ username, displayName, fid, authToken, onShowLeaderboard 
         ctx.fill()
       }
 
-      // Draw player
+      // Draw player with rotation based on lane
       const playerY = playerYRef.current
+      const playerCenterX = PLAYER_X + PLAYER_WIDTH / 2
+      const playerCenterY = playerY + PLAYER_HEIGHT / 2
+
+      // Calculate rotation: 0° on floor, 180° on ceiling, animated during flip
+      let rotation = 0
+      if (isFlippingRef.current) {
+        const flipProgress = Math.min(1, (currentTime - flipStartTimeRef.current) / FLIP_DURATION)
+        const eased = 1 - Math.pow(1 - flipProgress, 3)
+        // Rotate from current to target
+        if (playerLaneRef.current === 'ceiling') {
+          rotation = eased * Math.PI // 0 to 180°
+        } else {
+          rotation = Math.PI - (eased * Math.PI) // 180° to 0
+        }
+      } else {
+        rotation = playerLaneRef.current === 'ceiling' ? Math.PI : 0
+      }
+
+      ctx.save()
+      ctx.translate(playerCenterX, playerCenterY)
+      ctx.rotate(rotation)
+      ctx.translate(-playerCenterX, -playerCenterY)
+
+      // Body
       ctx.fillStyle = '#3498db'
       ctx.fillRect(PLAYER_X, playerY, PLAYER_WIDTH, PLAYER_HEIGHT)
 
+      // Eye and mouth
       ctx.fillStyle = '#2980b9'
       ctx.fillRect(PLAYER_X + PLAYER_WIDTH - 8, playerY + 8, 6, 6)
       ctx.fillRect(PLAYER_X + PLAYER_WIDTH - 8, playerY + 20, 6, 4)
 
+      // Legs with running animation
       const legOffset = gameStateRef.current === 'playing' ? Math.sin(currentTime / 50) * 4 : 0
       ctx.fillStyle = '#2980b9'
       ctx.fillRect(PLAYER_X + 5, playerY + PLAYER_HEIGHT, 8, 8 + legOffset)
       ctx.fillRect(PLAYER_X + PLAYER_WIDTH - 13, playerY + PLAYER_HEIGHT, 8, 8 - legOffset)
+
+      ctx.restore()
 
       animationFrameRef.current = requestAnimationFrame(gameLoop)
     }

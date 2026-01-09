@@ -23,22 +23,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const expectedHeader = `Bearer ${cronSecret}`
-    if (authHeader !== expectedHeader) {
-      // Debug: log first/last 4 chars to help diagnose mismatch
-      const receivedPreview = authHeader ? `${authHeader.slice(0, 11)}...${authHeader.slice(-4)} (len: ${authHeader.length})` : 'null'
-      const expectedPreview = `${expectedHeader.slice(0, 11)}...${expectedHeader.slice(-4)} (len: ${expectedHeader.length})`
-      console.error(`[Payout Cron] Auth mismatch - received: ${receivedPreview}, expected: ${expectedPreview}`)
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json(
-        {
-          error: 'Unauthorized',
-          debug: {
-            receivedLength: authHeader?.length || 0,
-            expectedLength: expectedHeader.length,
-            receivedStart: authHeader?.slice(0, 11) || 'null',
-            expectedStart: expectedHeader.slice(0, 11),
-          }
-        },
+        { error: 'Unauthorized' },
         { status: 401 }
       )
     }
