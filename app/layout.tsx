@@ -14,10 +14,28 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: APP_CONFIG.title,
   description: APP_CONFIG.description,
+  icons: {
+    icon: '/icon.png',
+    apple: '/icon.png',
+  },
+  openGraph: {
+    title: APP_CONFIG.title,
+    description: APP_CONFIG.description,
+    images: [`${BASE_URL}/embed-preview.png`],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: APP_CONFIG.title,
+    description: APP_CONFIG.description,
+    images: [`${BASE_URL}/embed-preview.png`],
+  },
   other: {
     'fc:miniapp': JSON.stringify({
       version: '1',
       imageUrl: `${BASE_URL}/embed-preview.png`,
+      splashImageUrl: `${BASE_URL}/splash.png`,
+      splashBackgroundColor: '#1a1a2e',
       button: {
         title: APP_CONFIG.miniAppButtonTitle,
         action: {
