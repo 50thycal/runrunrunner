@@ -65,19 +65,25 @@ export function useAuthSession() {
   const [error, setError] = useState<string | null>(null)
   const [isInMiniApp, setIsInMiniApp] = useState<boolean | null>(null)
 
-  // CRITICAL: Signal to Farcaster that app is ready
+  // CRITICAL: Signal to Farcaster that app is ready IMMEDIATELY
   useEffect(() => {
     const initApp = async () => {
-      // Check if we're in a mini app context first
+      // Signal to Farcaster that the app is ready FIRST to hide splash screen
+      // This must be called as early as possible
+      try {
+        await sdk.actions.ready()
+      } catch (e) {
+        // Silently handle - may fail outside mini app context
+        console.log('sdk.actions.ready() called outside mini app context')
+      }
+
+      // Then check if we're in a mini app context
       const inMiniApp = await sdk.isInMiniApp()
       setIsInMiniApp(inMiniApp)
 
       if (!inMiniApp) {
         setStatus('signedOut')
       }
-
-      // Signal to Farcaster that the app is ready to display
-      await sdk.actions.ready()
     }
 
     initApp()
