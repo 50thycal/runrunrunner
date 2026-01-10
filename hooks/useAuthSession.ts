@@ -67,14 +67,20 @@ export function useAuthSession() {
 
   // CRITICAL: Signal to Farcaster that app is ready
   useEffect(() => {
-    sdk.actions.ready()
-
-    sdk.isInMiniApp().then((inMiniApp) => {
+    const initApp = async () => {
+      // Check if we're in a mini app context first
+      const inMiniApp = await sdk.isInMiniApp()
       setIsInMiniApp(inMiniApp)
+
       if (!inMiniApp) {
         setStatus('signedOut')
       }
-    })
+
+      // Signal to Farcaster that the app is ready to display
+      await sdk.actions.ready()
+    }
+
+    initApp()
   }, [])
 
   // When in miniapp, require explicit sign-in for verification
