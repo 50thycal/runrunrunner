@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjIwOTY1LCJ0eXBlIjoiY3VzdG9keSIsImtleSI6IjB4... [REPLACE WITH YOUR SIGNED HEADER]",
+    "payload": "eyJkb21haW4iOiJydW5ydW5ydW5uZXIudmVyY2VsLmFwcCJ9",
+    "signature": "... [REPLACE WITH YOUR SIGNATURE]"
+  },
+  "frame": {
+    "version": "1",
+    "name": "runrunrunner",
+    "iconUrl": "https://runrunrunner.vercel.app/api/images/icon",
+    "homeUrl": "https://runrunrunner.vercel.app",
+    "imageUrl": "https://runrunrunner.vercel.app/api/images/preview",
+    "splashImageUrl": "https://runrunrunner.vercel.app/api/images/splash",
+    "splashBackgroundColor": "#1a1a2e",
+    "buttonTitle": "Play Game",
+    "webhookUrl": ""
+  }
+}
