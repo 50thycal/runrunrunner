@@ -4,4 +4,6 @@
   "icon": "https://runrunrunner.vercel.app/api/images/icon",
   "homeUrl": "https://runrunrunner.vercel.app",
   "description": "run run runner",
+  "buttonTitle": "run",
+  "noindex": false
 }
