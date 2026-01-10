@@ -173,6 +173,7 @@ export default function Home() {
       fid={user.fid}
       authToken={user.authToken!}
       onShowLeaderboard={() => setShowLeaderboard(true)}
+      onBackToLobby={() => setShowGame(false)}
     />
   )
 }

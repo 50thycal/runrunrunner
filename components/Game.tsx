@@ -32,9 +32,10 @@ interface GameProps {
   fid: number
   authToken: string // Required auth token for authenticated API requests
   onShowLeaderboard?: () => void
+  onBackToLobby?: () => void
 }
 
-export function Game({ username, displayName, fid, authToken, onShowLeaderboard }: GameProps) {
+export function Game({ username, displayName, fid, authToken, onShowLeaderboard, onBackToLobby }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [gameState, setGameState] = useState<GameState>('idle')
@@ -740,6 +741,28 @@ export function Game({ username, displayName, fid, authToken, onShowLeaderboard 
                 }}
               >
                 Leaderboard
+              </button>
+            )}
+
+            {onBackToLobby && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onBackToLobby()
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
+                style={{
+                  padding: '10px 24px',
+                  fontSize: 14,
+                  fontFamily: 'monospace',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                }}
+              >
+                Lobby
               </button>
             )}
           </div>

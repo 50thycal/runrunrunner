@@ -15,26 +15,26 @@ export const metadata: Metadata = {
   title: APP_CONFIG.title,
   description: APP_CONFIG.description,
   icons: {
-    icon: '/icon.svg',
-    apple: '/icon.svg',
+    icon: '/api/images/icon',
+    apple: '/api/images/icon',
   },
   openGraph: {
     title: APP_CONFIG.title,
     description: APP_CONFIG.description,
-    images: [`${BASE_URL}/embed-preview.svg`],
+    images: [`${BASE_URL}/api/images/preview`],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: APP_CONFIG.title,
     description: APP_CONFIG.description,
-    images: [`${BASE_URL}/embed-preview.svg`],
+    images: [`${BASE_URL}/api/images/preview`],
   },
   other: {
     'fc:miniapp': JSON.stringify({
       version: '1',
-      imageUrl: `${BASE_URL}/embed-preview.svg`,
-      splashImageUrl: `${BASE_URL}/splash.svg`,
+      imageUrl: `${BASE_URL}/api/images/preview`,
+      splashImageUrl: `${BASE_URL}/api/images/splash`,
       splashBackgroundColor: '#1a1a2e',
       button: {
         title: APP_CONFIG.miniAppButtonTitle,
