@@ -7,11 +7,13 @@
   "frame": {
     "version": "1",
     "name": "runrunrunner",
+    "description": "Endless runner game with daily ETH prizes. Dodge obstacles, climb the leaderboard, and compete for the top 3 spots to win real crypto rewards on Base.",
     "iconUrl": "https://runrunrunner.vercel.app/api/images/icon",
     "homeUrl": "https://runrunrunner.vercel.app",
     "imageUrl": "https://runrunrunner.vercel.app/api/images/preview",
     "splashImageUrl": "https://runrunrunner.vercel.app/api/images/splash",
     "splashBackgroundColor": "#1a1a2e",
-    "buttonTitle": "Play Game"
+    "buttonTitle": "Play Game",
+    "noindex": false
   }
 }
