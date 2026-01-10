@@ -1,7 +1,7 @@
 {
   "version": "v1",
   "name": "runrunrunner",
-  "icon": "https://yourdomain.com/icon.png",
+  "icon": "https://runrunrunner.vercel.app/api/images/icon",
   "homeUrl": "https://runrunrunner.vercel.app",
   "description": "run run runner",
 }
