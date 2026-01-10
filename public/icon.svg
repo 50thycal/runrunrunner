@@ -1,0 +1,21 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#1a1a2e" rx="64"/>
+
+  <!-- Floor lane -->
+  <rect x="0" y="380" width="512" height="4" fill="#4a4a6a"/>
+
+  <!-- Player character -->
+  <g transform="translate(206, 280)">
+    <!-- Body -->
+    <rect width="100" height="133" fill="#3498db" rx="4"/>
+    <!-- Eye -->
+    <rect x="72" y="27" width="20" height="20" fill="#2980b9" rx="2"/>
+    <!-- Mouth -->
+    <rect x="72" y="67" width="20" height="13" fill="#2980b9" rx="2"/>
+    <!-- Left leg -->
+    <rect x="17" y="133" width="27" height="27" fill="#2980b9"/>
+    <!-- Right leg -->
+    <rect x="57" y="133" width="27" height="27" fill="#2980b9"/>
+  </g>
+</svg>
