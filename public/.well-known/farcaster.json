@@ -13,7 +13,7 @@
     "imageUrl": "https://runrunrunner.vercel.app/api/images/preview",
     "splashImageUrl": "https://runrunrunner.vercel.app/api/images/splash",
     "splashBackgroundColor": "#1a1a2e",
-    "buttonTitle": "Play Game",
+    "buttonTitle": "run",
     "noindex": false
   }
 }
