@@ -43,6 +43,34 @@ export function Lobby({
 }: LobbyProps) {
   const [stats, setStats] = useState<UserStats | null>(null)
   const [loadingStats, setLoadingStats] = useState(true)
+  const [countdown, setCountdown] = useState('')
+
+  // Calculate time until next payout (00:05 UTC daily)
+  useEffect(() => {
+    const calculateCountdown = () => {
+      const now = new Date()
+      const nextPayout = new Date(now)
+      nextPayout.setUTCHours(0, 5, 0, 0)
+
+      // If we're past today's payout, set to tomorrow
+      if (now.getTime() > nextPayout.getTime()) {
+        nextPayout.setUTCDate(nextPayout.getUTCDate() + 1)
+      }
+
+      const diff = nextPayout.getTime() - now.getTime()
+      const hours = Math.floor(diff / (1000 * 60 * 60))
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+      setCountdown(
+        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      )
+    }
+
+    calculateCountdown()
+    const interval = setInterval(calculateCountdown, 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   const fetchStats = useCallback(async () => {
     try {
@@ -90,7 +118,6 @@ export function Lobby({
       {/* Header */}
       <div style={{ textAlign: 'center', marginTop: 20 }}>
         <h1 style={{ margin: 0, fontSize: 32 }}>runrunrunner</h1>
-        <p style={{ margin: '8px 0 0', opacity: 0.7 }}>v-012</p>
       </div>
 
       {/* User info */}
@@ -155,6 +182,29 @@ export function Lobby({
           </div>
         )}
       </div>
+
+      {/* Play button */}
+      <button
+        onClick={onPlay}
+        style={{
+          marginTop: 20,
+          padding: '16px 48px',
+          fontSize: 20,
+          fontFamily: 'monospace',
+          fontWeight: 'bold',
+          backgroundColor: '#8b5cf6',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 30,
+          cursor: 'pointer',
+          transition: 'transform 0.1s',
+        }}
+        onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.95)')}
+        onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+      >
+        PLAY
+      </button>
 
       {/* Contest info box */}
       <div
@@ -238,6 +288,31 @@ export function Lobby({
         >
           View Leaderboard
         </button>
+
+        {/* Payout countdown */}
+        <div
+          style={{
+            marginTop: 12,
+            padding: '10px',
+            backgroundColor: 'rgba(251, 191, 36, 0.1)',
+            borderRadius: 6,
+            border: '1px solid rgba(251, 191, 36, 0.3)',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontSize: 11, opacity: 0.7 }}>Next payout in</div>
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 'bold',
+              color: '#fbbf24',
+              fontFamily: 'monospace',
+              marginTop: 4,
+            }}
+          >
+            {countdown}
+          </div>
+        </div>
       </div>
 
       {/* Recent payouts */}
@@ -308,29 +383,6 @@ export function Lobby({
         </div>
       </details>
 
-      {/* Play button */}
-      <button
-        onClick={onPlay}
-        style={{
-          marginTop: 24,
-          padding: '16px 48px',
-          fontSize: 20,
-          fontFamily: 'monospace',
-          fontWeight: 'bold',
-          backgroundColor: '#8b5cf6',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 30,
-          cursor: 'pointer',
-          transition: 'transform 0.1s',
-        }}
-        onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.95)')}
-        onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-      >
-        PLAY
-      </button>
-
       {/* Sign out */}
       <button
         onClick={onSignOut}
@@ -349,10 +401,6 @@ export function Lobby({
         Sign Out
       </button>
 
-      {/* Footer */}
-      <div style={{ marginTop: 20, fontSize: 10, opacity: 0.4, textAlign: 'center' }}>
-        Prizes paid daily at 00:05 UTC
-      </div>
     </div>
   )
 }
