@@ -9,6 +9,12 @@ interface BuildEntry {
 const BUILD_LOG: BuildEntry[] = [
   {
     date: '2026-01-11',
+    title: 'Build Log Navigation Link',
+    description:
+      'Added a subtle "Build Log" link at the bottom of the Lobby screen so users can easily access the development changelog from within the app.',
+  },
+  {
+    date: '2026-01-11',
     title: 'README and Build Log Documentation',
     description:
       'Updated README to explain this is a vibe-coded Farcaster game with daily ETH prizes. Added instructions for AI assistants to update the build log when making changes. The build log now serves as a living changelog.',

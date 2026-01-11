@@ -407,6 +407,19 @@ export function Lobby({
         Sign Out
       </button>
 
+      {/* Build log link */}
+      <a
+        href="/build-log"
+        style={{
+          marginTop: 20,
+          fontSize: 11,
+          color: 'rgba(255,255,255,0.4)',
+          textDecoration: 'none',
+        }}
+      >
+        Build Log
+      </a>
+
     </div>
   )
 }
