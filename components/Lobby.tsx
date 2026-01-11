@@ -110,14 +110,50 @@ export function Lobby({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        padding: 20,
         overflowY: 'auto',
       }}
     >
-      {/* Header */}
-      <div style={{ textAlign: 'center', marginTop: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 32 }}>runrunrunner</h1>
+      {/* Top navigation bar */}
+      <div
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '12px 20px',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          backgroundColor: 'rgba(0,0,0,0.2)',
+        }}
+      >
+        <h1 style={{ margin: 0, fontSize: 20 }}>runrunrunner</h1>
+        <a
+          href="/build-log"
+          style={{
+            fontSize: 12,
+            color: '#8b5cf6',
+            textDecoration: 'none',
+            padding: '6px 12px',
+            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            borderRadius: 6,
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+          }}
+        >
+          Build Log
+        </a>
       </div>
+
+      {/* Main content area */}
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: 20,
+          overflowY: 'auto',
+          width: '100%',
+        }}
+      >
 
       {/* User info */}
       <div
@@ -406,7 +442,7 @@ export function Lobby({
       >
         Sign Out
       </button>
-
+      </div>
     </div>
   )
 }
