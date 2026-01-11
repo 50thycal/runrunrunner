@@ -9,6 +9,18 @@ interface BuildEntry {
 const BUILD_LOG: BuildEntry[] = [
   {
     date: '2026-01-11',
+    title: 'README and Build Log Documentation',
+    description:
+      'Updated README to explain this is a vibe-coded Farcaster game with daily ETH prizes. Added instructions for AI assistants to update the build log when making changes. The build log now serves as a living changelog.',
+  },
+  {
+    date: '2026-01-11',
+    title: 'Build Log Page',
+    description:
+      'Created a dedicated build log page at /build-log to track development progress. Each entry includes a date, title, and brief description of changes. This documents the vibe coding journey.',
+  },
+  {
+    date: '2026-01-11',
     title: 'Game Speed Curve Adjustment',
     description:
       'Adjusted the game speed progression to reach 6x max speed over 60 seconds instead of the previous 3x over 16 seconds. This creates a more gradual difficulty curve that rewards longer play sessions.',
