@@ -21,8 +21,8 @@ const OBSTACLE_HEIGHT = 50
 const FLIP_DURATION = 150 // ms
 const MIN_OBSTACLE_GAP = 250 // minimum pixels between obstacles
 const BASE_SPEED = 4
-const MAX_SPEED = 12
-const SPEED_INCREASE_RATE = 0.0005
+const MAX_SPEED = 24 // 6x base speed
+const SPEED_INCREASE_RATE = 0.000333 // reaches max in ~60 seconds
 const BASE_SPAWN_INTERVAL = 1500 // ms
 const MIN_SPAWN_INTERVAL = 600 // ms
 
