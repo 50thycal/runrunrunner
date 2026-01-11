@@ -25,7 +25,6 @@ interface LobbyProps {
   pfpUrl?: string
   verified: boolean
   fid: number
-  bestScore: number
   onPlay: () => void
   onSignOut: () => void
   onShowLeaderboard: () => void
@@ -37,7 +36,6 @@ export function Lobby({
   pfpUrl,
   verified,
   fid,
-  bestScore,
   onPlay,
   onSignOut,
   onShowLeaderboard,
