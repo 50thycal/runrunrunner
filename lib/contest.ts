@@ -204,8 +204,11 @@ export function validateScoreDuration(score: number, durationMs: number): boolea
 const keys = {
   session: (token: string) => `session:${token}`,
   scores: (contestDay: string) => `scores:${contestDay}`,
+  scoresAllTime: () => `scores:alltime`,
   scoreEntry: (contestDay: string, fid: number) => `score:${contestDay}:${fid}`,
+  scoreEntryAllTime: (fid: number) => `score:alltime:${fid}`,
   userBest: (fid: number, contestDay: string) => `user:${fid}:best:${contestDay}`,
+  userBestAllTime: (fid: number) => `user:${fid}:best:alltime`,
   userGames: (fid: number, contestDay: string) => `user:${fid}:games:${contestDay}`,
   payout: (contestDay: string, fid: number) => `payout:${contestDay}:${fid}`,
   payoutsDone: (contestDay: string) => `payouts_done:${contestDay}`,
@@ -339,6 +342,31 @@ export async function submitScore(
   // Update user's best score
   await kv.set(userBestKey, score, { ex: 86400 * 2 }) // Expire in 2 days
 
+  // Update all-time best score if this is higher
+  const allTimeBestKey = keys.userBestAllTime(fid)
+  const existingAllTimeBest = await kv.get<number>(allTimeBestKey)
+  if (existingAllTimeBest === null || score > existingAllTimeBest) {
+    await kv.set(allTimeBestKey, score)
+
+    // Update all-time leaderboard
+    const allTimeScoresKey = keys.scoresAllTime()
+    await kv.zrem(allTimeScoresKey, fidStr)
+    await kv.zadd(allTimeScoresKey, { score: score, member: fidStr })
+
+    // Store all-time entry details
+    const allTimeEntryKey = keys.scoreEntryAllTime(fid)
+    const allTimeEntry: ScoreEntry = {
+      fid,
+      score,
+      username,
+      displayName,
+      submittedAt: Date.now(),
+      sessionToken: token,
+      duration,
+    }
+    await kv.set(allTimeEntryKey, allTimeEntry)
+  }
+
   // Get rank
   const rank = await getUserRank(fid, contestDay)
   console.log(`[submitScore] FID ${fid} submitted score ${score}, got rank: ${rank}`)
@@ -436,6 +464,56 @@ export async function getLeaderboard(contestDay?: string, limit: number = 10): P
   }
 
   return entries
+}
+
+export async function getAllTimeLeaderboard(limit: number = 10): Promise<LeaderboardEntry[]> {
+  requireKV()
+  const scoresKey = keys.scoresAllTime()
+
+  // Get top scores (highest first)
+  const results = await kv.zrange(scoresKey, 0, limit - 1, { rev: true, withScores: true })
+
+  const entries: LeaderboardEntry[] = []
+  for (let i = 0; i < results.length; i += 2) {
+    const rawMember = results[i]
+    const rawScore = results[i + 1]
+
+    let fid: number
+    let username: string | undefined
+    let displayName: string | undefined
+
+    if (typeof rawMember === 'number') {
+      fid = rawMember
+    } else if (typeof rawMember === 'string') {
+      fid = parseInt(rawMember, 10)
+      if (isNaN(fid)) continue
+    } else {
+      continue
+    }
+
+    // Fetch entry details
+    const entryKey = keys.scoreEntryAllTime(fid)
+    const entry = await kv.get<ScoreEntry>(entryKey)
+    username = entry?.username
+    displayName = entry?.displayName
+
+    const score = typeof rawScore === 'number' ? rawScore : parseFloat(String(rawScore))
+
+    entries.push({
+      rank: Math.floor(i / 2) + 1,
+      fid,
+      score,
+      username,
+      displayName,
+    })
+  }
+
+  return entries
+}
+
+export async function getUserAllTimeBest(fid: number): Promise<number | null> {
+  requireKV()
+  return kv.get<number>(keys.userBestAllTime(fid))
 }
 
 export async function getUserRank(fid: number, contestDay?: string): Promise<number | null> {

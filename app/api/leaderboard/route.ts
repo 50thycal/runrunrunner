@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getLeaderboard, getContestDay, CONTEST_CONFIG, KVNotConfiguredError } from '@/lib/contest'
+import { getLeaderboard, getAllTimeLeaderboard, getContestDay, CONTEST_CONFIG, KVNotConfiguredError } from '@/lib/contest'
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const day = searchParams.get('day') || getContestDay()
+    const type = searchParams.get('type') || 'daily'
     const limit = Math.min(parseInt(searchParams.get('limit') || '10', 10), 100)
 
+    if (type === 'alltime') {
+      const leaderboard = await getAllTimeLeaderboard(limit)
+      return NextResponse.json({
+        ok: true,
+        type: 'alltime',
+        leaderboard,
+      })
+    }
+
+    // Daily leaderboard (default)
+    const day = searchParams.get('day') || getContestDay()
     const leaderboard = await getLeaderboard(day, limit)
 
     // Add prize info to top 3
@@ -17,6 +28,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      type: 'daily',
       contestDay: day,
       leaderboard: withPrizes,
       prizes: CONTEST_CONFIG.PAYOUTS,

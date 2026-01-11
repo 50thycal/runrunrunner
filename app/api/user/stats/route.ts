@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserStats, CONTEST_CONFIG, KVNotConfiguredError } from '@/lib/contest'
+import { getUserStats, getUserAllTimeBest, CONTEST_CONFIG, KVNotConfiguredError } from '@/lib/contest'
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const stats = await getUserStats(fid)
+    const [stats, allTimeBest] = await Promise.all([
+      getUserStats(fid),
+      getUserAllTimeBest(fid),
+    ])
 
     // Determine eligibility status
     const isEligible = stats.todayRank !== null && stats.todayRank <= 3
@@ -33,6 +36,7 @@ export async function GET(request: NextRequest) {
       ok: true,
       stats: {
         ...stats,
+        allTimeBest,
         isEligible,
         prizeAmount,
         maxGamesPerHour: CONTEST_CONFIG.MAX_GAMES_PER_HOUR,

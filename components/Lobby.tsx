@@ -9,6 +9,7 @@ interface UserStats {
   isEligible: boolean
   prizeAmount: string | null
   gamesRemaining: number
+  allTimeBest: number | null
   payouts: Array<{
     contestDay: string
     rank: number
@@ -187,17 +188,18 @@ export function Lobby({
       <button
         onClick={onPlay}
         style={{
-          marginTop: 20,
-          padding: '16px 48px',
-          fontSize: 20,
+          marginTop: 24,
+          padding: '20px 64px',
+          fontSize: 28,
           fontFamily: 'monospace',
           fontWeight: 'bold',
           backgroundColor: '#8b5cf6',
           color: '#fff',
           border: 'none',
-          borderRadius: 30,
+          borderRadius: 40,
           cursor: 'pointer',
-          transition: 'transform 0.1s',
+          transition: 'transform 0.1s, box-shadow 0.1s',
+          boxShadow: '0 4px 20px rgba(139, 92, 246, 0.5)',
         }}
         onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.95)')}
         onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
@@ -205,6 +207,27 @@ export function Lobby({
       >
         PLAY
       </button>
+
+      {/* All Time High Score */}
+      {stats?.allTimeBest && stats.allTimeBest > 0 && (
+        <div
+          style={{
+            marginTop: 16,
+            textAlign: 'center',
+            padding: '12px 24px',
+            backgroundColor: 'rgba(251, 191, 36, 0.1)',
+            borderRadius: 8,
+            border: '1px solid rgba(251, 191, 36, 0.3)',
+          }}
+        >
+          <div style={{ fontSize: 11, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 1 }}>
+            All Time High Score
+          </div>
+          <div style={{ fontSize: 32, fontWeight: 'bold', color: '#fbbf24', marginTop: 4 }}>
+            {stats.allTimeBest}
+          </div>
+        </div>
+      )}
 
       {/* Contest info box */}
       <div
@@ -345,21 +368,6 @@ export function Lobby({
               </a>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Best score */}
-      {bestScore > 0 && (
-        <div
-          style={{
-            marginTop: 16,
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ fontSize: 12, opacity: 0.7 }}>LOCAL BEST</div>
-          <div style={{ fontSize: 28, fontWeight: 'bold', color: '#fbbf24' }}>
-            {bestScore}
-          </div>
         </div>
       )}
 

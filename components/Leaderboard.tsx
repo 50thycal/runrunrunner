@@ -8,13 +8,15 @@ interface LeaderboardEntry {
   score: number
   username?: string
   displayName?: string
-  prize: string | null
+  prize?: string | null
 }
 
 interface Prize {
   rank: number
   amount: string
 }
+
+type LeaderboardType = 'daily' | 'alltime'
 
 interface LeaderboardProps {
   fid: number
@@ -28,13 +30,18 @@ export function Leaderboard({ fid, onClose }: LeaderboardProps) {
   const [prizes, setPrizes] = useState<Prize[]>([])
   const [contestDay, setContestDay] = useState<string>('')
   const [userRank, setUserRank] = useState<number | null>(null)
+  const [viewType, setViewType] = useState<LeaderboardType>('daily')
 
-  const fetchLeaderboard = useCallback(async () => {
+  const fetchLeaderboard = useCallback(async (type: LeaderboardType) => {
     try {
       setLoading(true)
       setError(null)
 
-      const response = await fetch('/api/leaderboard?limit=20')
+      const url = type === 'alltime'
+        ? '/api/leaderboard?type=alltime&limit=20'
+        : '/api/leaderboard?limit=20'
+
+      const response = await fetch(url)
       const data = await response.json()
 
       if (!response.ok) {
@@ -42,8 +49,8 @@ export function Leaderboard({ fid, onClose }: LeaderboardProps) {
       }
 
       setLeaderboard(data.leaderboard)
-      setPrizes(data.prizes)
-      setContestDay(data.contestDay)
+      setPrizes(data.prizes || [])
+      setContestDay(data.contestDay || '')
 
       // Find user's rank
       const userEntry = data.leaderboard.find((e: LeaderboardEntry) => e.fid === fid)
@@ -56,8 +63,8 @@ export function Leaderboard({ fid, onClose }: LeaderboardProps) {
   }, [fid])
 
   useEffect(() => {
-    fetchLeaderboard()
-  }, [fetchLeaderboard])
+    fetchLeaderboard(viewType)
+  }, [fetchLeaderboard, viewType])
 
   const formatPrize = (amount: string) => {
     const eth = parseFloat(amount)
@@ -96,7 +103,7 @@ export function Leaderboard({ fid, onClose }: LeaderboardProps) {
         <div>
           <h1 style={{ margin: 0, fontSize: 20 }}>Leaderboard</h1>
           <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.7 }}>
-            {contestDay} (UTC)
+            {viewType === 'daily' ? `${contestDay} (UTC)` : 'All Time Best Scores'}
           </p>
         </div>
         <button
@@ -116,39 +123,86 @@ export function Leaderboard({ fid, onClose }: LeaderboardProps) {
         </button>
       </div>
 
-      {/* Prize info */}
+      {/* Toggle */}
       <div
         style={{
+          display: 'flex',
           padding: '12px 20px',
-          backgroundColor: 'rgba(139, 92, 246, 0.1)',
+          gap: 8,
           borderBottom: '1px solid rgba(255,255,255,0.1)',
         }}
       >
-        <p style={{ margin: 0, fontSize: 12, opacity: 0.8 }}>
-          Daily prizes (Base L2):
-        </p>
-        <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-          {prizes.map((prize) => (
-            <div key={prize.rank} style={{ fontSize: 12 }}>
-              <span style={{ color: '#fbbf24' }}>#{prize.rank}</span>
-              <span style={{ marginLeft: 4 }}>{formatPrize(prize.amount)}</span>
-            </div>
-          ))}
-        </div>
+        <button
+          onClick={() => setViewType('daily')}
+          style={{
+            flex: 1,
+            padding: '10px',
+            fontSize: 13,
+            fontFamily: 'monospace',
+            fontWeight: viewType === 'daily' ? 'bold' : 'normal',
+            backgroundColor: viewType === 'daily' ? '#8b5cf6' : 'rgba(255,255,255,0.1)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            cursor: 'pointer',
+          }}
+        >
+          Daily
+        </button>
+        <button
+          onClick={() => setViewType('alltime')}
+          style={{
+            flex: 1,
+            padding: '10px',
+            fontSize: 13,
+            fontFamily: 'monospace',
+            fontWeight: viewType === 'alltime' ? 'bold' : 'normal',
+            backgroundColor: viewType === 'alltime' ? '#8b5cf6' : 'rgba(255,255,255,0.1)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            cursor: 'pointer',
+          }}
+        >
+          All Time
+        </button>
       </div>
+
+      {/* Prize info - only for daily */}
+      {viewType === 'daily' && (
+        <div
+          style={{
+            padding: '12px 20px',
+            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
+          }}
+        >
+          <p style={{ margin: 0, fontSize: 12, opacity: 0.8 }}>
+            Daily prizes (Base L2):
+          </p>
+          <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+            {prizes.map((prize) => (
+              <div key={prize.rank} style={{ fontSize: 12 }}>
+                <span style={{ color: '#fbbf24' }}>#{prize.rank}</span>
+                <span style={{ marginLeft: 4 }}>{formatPrize(prize.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* User rank highlight */}
       {userRank && (
         <div
           style={{
             padding: '12px 20px',
-            backgroundColor: userRank <= 3 ? 'rgba(251, 191, 36, 0.1)' : 'rgba(255,255,255,0.05)',
+            backgroundColor: userRank <= 3 && viewType === 'daily' ? 'rgba(251, 191, 36, 0.1)' : 'rgba(255,255,255,0.05)',
             borderBottom: '1px solid rgba(255,255,255,0.1)',
           }}
         >
           <p style={{ margin: 0, fontSize: 14 }}>
             Your rank: <strong style={{ color: userRank <= 3 ? '#fbbf24' : '#fff' }}>#{userRank}</strong>
-            {userRank <= 3 && <span style={{ marginLeft: 8 }}>🏆 Prize eligible!</span>}
+            {userRank <= 3 && viewType === 'daily' && <span style={{ marginLeft: 8 }}>🏆 Prize eligible!</span>}
           </p>
         </div>
       )}
@@ -165,7 +219,7 @@ export function Leaderboard({ fid, onClose }: LeaderboardProps) {
           <div style={{ padding: 40, textAlign: 'center', color: '#e74c3c' }}>
             {error}
             <button
-              onClick={fetchLeaderboard}
+              onClick={() => fetchLeaderboard(viewType)}
               style={{
                 display: 'block',
                 margin: '16px auto 0',
@@ -263,7 +317,9 @@ export function Leaderboard({ fid, onClose }: LeaderboardProps) {
           opacity: 0.5,
         }}
       >
-        Prizes paid daily at 00:05 UTC on Base L2
+        {viewType === 'daily'
+          ? 'Prizes paid daily at 00:05 UTC on Base L2'
+          : 'All-time high scores (no prizes)'}
       </div>
     </div>
   )
