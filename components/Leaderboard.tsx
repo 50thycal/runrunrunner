@@ -219,7 +219,7 @@ export function Leaderboard({ fid, onClose }: LeaderboardProps) {
           <div style={{ padding: 40, textAlign: 'center', color: '#e74c3c' }}>
             {error}
             <button
-              onClick={fetchLeaderboard}
+              onClick={() => fetchLeaderboard(viewType)}
               style={{
                 display: 'block',
                 margin: '16px auto 0',
